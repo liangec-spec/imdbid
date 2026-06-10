@@ -21,8 +21,7 @@ app = Flask(__name__)
 SCRIPTS = {
     "emby": os.path.join(PROJECT_ROOT, "scripts", "export_emby.py"),
     "imdb": os.path.join(PROJECT_ROOT, "scripts", "fetch_imdb_top250.py"),
-    "douban_bin": os.path.join(PROJECT_ROOT, "douban-scraper", "douban-scraper"),
-    "douban_import": os.path.join(PROJECT_ROOT, "scripts", "import_douban.py"),
+    "douban": os.path.join(PROJECT_ROOT, "scripts", "fetch_douban_top250.py"),
 }
 
 # 任务状态（线程安全）
@@ -154,36 +153,10 @@ def update_douban():
         if s.get("status") == "running":
             return jsonify({"status": "busy", "message": "任务正在执行中"})
 
-    def run_douban():
-        douban_dir = os.path.join(PROJECT_ROOT, "douban-scraper")
-
-        # 先运行 Go 爬虫
-        update_status("douban", "running", "正在爬取豆瓣数据...")
-        try:
-            r1 = subprocess.run(
-                [SCRIPTS["douban_bin"]], capture_output=True, text=True,
-                timeout=300, cwd=douban_dir,
-            )
-            if r1.returncode != 0:
-                update_status("douban", "error", "爬取失败: " + r1.stderr[-200:])
-                return
-
-            # 再导入数据库
-            update_status("douban", "running", "正在导入数据库...")
-            r2 = subprocess.run(
-                [sys.executable, SCRIPTS["douban_import"]],
-                capture_output=True, text=True, timeout=60,
-            )
-            if r2.returncode == 0:
-                output = r2.stdout.strip()
-                last_line = output.split("\n")[-1] if output else "完成"
-                update_status("douban", "done", last_line)
-            else:
-                update_status("douban", "error", "导入失败: " + r2.stderr[-200:])
-        except Exception as e:
-            update_status("douban", "error", str(e))
-
-    thread = threading.Thread(target=run_douban)
+    thread = threading.Thread(
+        target=run_task,
+        args=("douban", [sys.executable, SCRIPTS["douban"]]),
+    )
     thread.start()
     return jsonify({"status": "started"})
 
