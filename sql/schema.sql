@@ -1,11 +1,11 @@
 -- Emby 电影管理系统 - 数据库结构
--- 数据库名: emby_movies
+-- 数据库名: douban_top250
 
-CREATE DATABASE IF NOT EXISTS emby_movies
+CREATE DATABASE IF NOT EXISTS douban_top250
     CHARACTER SET utf8mb4
     COLLATE utf8mb4_unicode_ci;
 
-USE emby_movies;
+USE douban_top250;
 
 -- Emby 电影表
 CREATE TABLE IF NOT EXISTS emby_movies (
