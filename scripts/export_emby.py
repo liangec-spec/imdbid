@@ -115,18 +115,15 @@ def parse_movie(item: Dict) -> Dict:
     runtime_ticks = item.get("RuntimeTicks", 0)
     runtime_minutes = int(runtime_ticks / 600000000) if runtime_ticks else 0
 
-    # 处理日期
+    # 处理日期（空字符串转为 None，否则 MySQL DATE 类型报错）
     release_date = item.get("ReleaseDate", "")
-    if release_date:
-        release_date = release_date.split("T")[0]
+    release_date = release_date.split("T")[0] if release_date else None
 
     date_created = item.get("DateCreated", "")
-    if date_created:
-        date_created = date_created.split("T")[0]
+    date_created = date_created.split("T")[0] if date_created else None
 
     date_modified = item.get("DateModified", "")
-    if date_modified:
-        date_modified = date_modified.split("T")[0]
+    date_modified = date_modified.split("T")[0] if date_modified else None
 
     imdb_id = provider_ids.get("Imdb", "")
 
