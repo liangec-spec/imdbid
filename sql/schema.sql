@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS emby_movies (
     date_added DATE COMMENT '添加日期',
     date_modified DATE COMMENT '修改日期',
     tags VARCHAR(255) COMMENT '标签',
-    official_rating VARCHAR(20) COMMENT '分级',
+    official_rating VARCHAR(100) COMMENT '分级',
     production_year INT COMMENT '制作年份',
     imdb_rating DECIMAL(3,1) COMMENT 'IMDB 评分',
     imdb_votes INT COMMENT 'IMDB 投票数',
