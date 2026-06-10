@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Emby 电影管理</title>
+<style>
+  :root { --bg: #0f172a; --card: #1e293b; --accent: #38bdf8; --text: #e2e8f0; --dim: #94a3b8; --green: #4ade80; --red: #f87171; --yellow: #fbbf24; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+  .header { text-align: center; padding: 40px 20px 20px; }
+  .header h1 { font-size: 28px; font-weight: 700; }
+  .header p { color: var(--dim); margin-top: 8px; }
+  .stats { display: flex; justify-content: center; gap: 24px; margin: 24px auto; flex-wrap: wrap; }
+  .stat { background: var(--card); border-radius: 12px; padding: 20px 32px; text-align: center; min-width: 200px; }
+  .stat .num { font-size: 36px; font-weight: 700; color: var(--accent); }
+  .stat .label { color: var(--dim); font-size: 14px; margin-top: 4px; }
+  .update-bar { display: flex; justify-content: center; gap: 12px; margin: 20px auto; flex-wrap: wrap; }
+  .update-btn { padding: 10px 20px; border-radius: 8px; border: none; font-size: 14px; font-weight: 600; cursor: pointer; transition: all .2s; display: flex; align-items: center; gap: 8px; }
+  .update-btn:disabled { opacity: .6; cursor: not-allowed; }
+  .btn-emby { background: var(--green); color: #000; }
+  .btn-emby:hover:not(:disabled) { background: #22c55e; }
+  .btn-imdb { background: var(--yellow); color: #000; }
+  .btn-imdb:hover:not(:disabled) { background: #f59e0b; }
+  .btn-douban { background: var(--accent); color: #000; }
+  .btn-douban:hover:not(:disabled) { background: #0ea5e9; }
+  .status-bar { text-align: center; margin: 8px 0; min-height: 24px; }
+  .status-msg { font-size: 13px; padding: 4px 12px; border-radius: 6px; display: inline-block; }
+  .status-running { background: rgba(251,191,36,.15); color: var(--yellow); }
+  .status-done { background: rgba(74,222,128,.15); color: var(--green); }
+  .status-error { background: rgba(248,113,113,.15); color: var(--red); }
+  .tabs { display: flex; justify-content: center; gap: 8px; margin: 24px 20px 0; flex-wrap: wrap; }
+  .tab { padding: 10px 24px; border-radius: 8px; background: var(--card); color: var(--dim); cursor: pointer; font-size: 15px; border: 2px solid transparent; transition: all .2s; user-select: none; }
+  .tab:hover { color: var(--text); }
+  .tab.active { border-color: var(--accent); color: var(--accent); background: rgba(56,189,248,.08); }
+  .panel { display: none; max-width: 1200px; margin: 20px auto; padding: 0 20px; }
+  .panel.active { display: block; }
+  table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: 12px; overflow: hidden; }
+  th { background: rgba(56,189,248,.1); color: var(--accent); text-align: left; padding: 12px 16px; font-size: 13px; text-transform: uppercase; letter-spacing: .5px; white-space: nowrap; }
+  th.sortable { cursor: pointer; user-select: none; }
+  th.sortable:hover { background: rgba(56,189,248,.2); }
+  th .arrow { font-size: 10px; margin-left: 4px; opacity: .3; }
+  th.sorted-asc .arrow.up, th.sorted-desc .arrow.down { opacity: 1; color: var(--green); }
+  td { padding: 10px 16px; border-top: 1px solid rgba(255,255,255,.05); font-size: 14px; }
+  tr:hover td { background: rgba(255,255,255,.03); }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 99px; font-weight: 600; }
+  .badge-yes { background: var(--green); color: #000; }
+  .badge-no { background: rgba(255,255,255,.08); color: var(--dim); }
+  .count { text-align: center; margin: 16px 0; color: var(--dim); font-size: 14px; }
+  .toolbar { display: flex; justify-content: center; align-items: center; gap: 20px; margin: 16px 20px; flex-wrap: wrap; }
+  .search-box input { background: var(--card); border: 1px solid rgba(255,255,255,.1); color: var(--text); padding: 8px 16px; border-radius: 8px; width: 260px; font-size: 14px; outline: none; }
+  .search-box input:focus { border-color: var(--accent); }
+  .filters { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+  .filters label { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 14px; color: var(--dim); }
+  .filters label:hover { color: var(--text); }
+  .filters input[type="checkbox"] { accent-color: var(--accent); width: 16px; height: 16px; }
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(0,0,0,.3); border-top-color: #000; border-radius: 50%; animation: spin .6s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (max-width: 768px) {
+    .stats { flex-direction: column; align-items: center; }
+    td, th { padding: 8px 10px; font-size: 13px; }
+    .search-box input { width: 100%; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🎬 Emby 电影管理</h1>
+  <p>对比豆瓣 / IMDB Top 250，查看 Emby 库电影清单</p>
+</div>
+
+<!-- 更新按钮 -->
+<div class="update-bar">
+  <button class="update-btn btn-emby" onclick="triggerUpdate('emby')" id="btn-emby">🔄 更新 Emby 清单</button>
+  <button class="update-btn btn-imdb" onclick="triggerUpdate('imdb')" id="btn-imdb">🔄 更新 IMDB 250</button>
+  <button class="update-btn btn-douban" onclick="triggerUpdate('douban')" id="btn-douban">🔄 更新豆瓣 250</button>
+</div>
+<div class="status-bar" id="statusBar"></div>
+
+<div class="stats">
+  <div class="stat">
+    <div class="num">{{ douban_missing|length }}<span style="font-size:18px;color:var(--dim)"> / {{ douban_total }}</span></div>
+    <div class="label">豆瓣 Top250 缺失</div>
+  </div>
+  <div class="stat">
+    <div class="num">{{ imdb_missing|length }}<span style="font-size:18px;color:var(--dim)"> / {{ imdb_total }}</span></div>
+    <div class="label">IMDB Top250 缺失</div>
+  </div>
+  <div class="stat">
+    <div class="num">{{ emby_movies|length }}</div>
+    <div class="label">Emby 电影总数</div>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab" onclick="switchTab(0)">📘 豆瓣缺失 ({{ douban_missing|length }})</div>
+  <div class="tab" onclick="switchTab(1)">📙 IMDB 缺失 ({{ imdb_missing|length }})</div>
+  <div class="tab active" onclick="switchTab(2)">🎬 Emby 清单 ({{ emby_movies|length }})</div>
+</div>
+
+<!-- 豆瓣缺失 -->
+<div class="panel" id="panel-0">
+  {% if douban_missing %}
+  <div class="count">共 {{ douban_missing|length }} 部电影在 Emby 库中缺失</div>
+  <table>
+    <thead><tr><th>#</th><th>排名</th><th>电影名称</th><th>IMDB ID</th></tr></thead>
+    <tbody>
+    {% for m in douban_missing %}
+    <tr>
+      <td>{{ loop.index }}</td>
+      <td>{{ m.ranking }}</td>
+      <td><a href="{{ m.douban_link }}" target="_blank">{{ m.title }}</a></td>
+      <td>{% if m.imdb_id %}<a href="https://www.imdb.com/title/{{ m.imdb_id }}/" target="_blank">{{ m.imdb_id }}</a>{% else %}-{% endif %}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="count" style="color:var(--green)">🎉 你的 Emby 库已拥有豆瓣 Top 250 全部电影！</div>
+  {% endif %}
+</div>
+
+<!-- IMDB 缺失 -->
+<div class="panel" id="panel-1">
+  {% if imdb_missing %}
+  <div class="count">共 {{ imdb_missing|length }} 部电影在 Emby 库中缺失</div>
+  <table>
+    <thead><tr><th>#</th><th>电影名称</th><th>IMDB ID</th></tr></thead>
+    <tbody>
+    {% for m in imdb_missing %}
+    <tr>
+      <td>{{ loop.index }}</td>
+      <td>{{ m.title }}</td>
+      <td><a href="https://www.imdb.com/title/{{ m.imdb_id }}/" target="_blank">{{ m.imdb_id }}</a></td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="count" style="color:var(--green)">🎉 你的 Emby 库已拥有 IMDB Top 250 全部电影！</div>
+  {% endif %}
+</div>
+
+<!-- Emby 电影清单 -->
+<div class="panel active" id="panel-2">
+  <div class="toolbar">
+    <div class="search-box">
+      <input type="text" id="searchInput" placeholder="🔍 搜索电影名称..." oninput="applyFilters()">
+    </div>
+    <div class="filters">
+      <label><input type="radio" name="filter250" value="all" onchange="applyFilters()" checked> 全部</label>
+      <label><input type="radio" name="filter250" value="imdb" onchange="applyFilters()"> 仅 IMDB 250</label>
+      <label><input type="radio" name="filter250" value="douban" onchange="applyFilters()"> 仅豆瓣 250</label>
+      <label><input type="radio" name="filter250" value="both" onchange="applyFilters()"> 两者都在 250</label>
+    </div>
+  </div>
+  <div class="count" id="embyCount">共 {{ emby_movies|length }} 部电影 | 点击表头排序</div>
+  <table id="embyTable">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th class="sortable" data-col="title" onclick="sortTable(this)">电影名称 <span class="arrow up">▲</span><span class="arrow down">▼</span></th>
+        <th class="sortable" data-col="year" onclick="sortTable(this)">年份 <span class="arrow up">▲</span><span class="arrow down">▼</span></th>
+        <th class="sortable" data-col="rating" onclick="sortTable(this)">评分 <span class="arrow up">▲</span><span class="arrow down">▼</span></th>
+        <th class="sortable" data-col="imdb_rating" onclick="sortTable(this)">IMDB评分 <span class="arrow up">▲</span><span class="arrow down">▼</span></th>
+        <th class="sortable" data-col="imdb_id" onclick="sortTable(this)">IMDB ID <span class="arrow up">▲</span><span class="arrow down">▼</span></th>
+        <th class="sortable" data-col="resolution" onclick="sortTable(this)">分辨率 <span class="arrow up">▲</span><span class="arrow down">▼</span></th>
+        <th>IMDB 250</th>
+        <th>豆瓣 250</th>
+        <th>导演</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for m in emby_movies %}
+    <tr data-imdb250="{{ m.in_imdb250 }}" data-douban250="{{ m.in_douban250 }}">
+      <td>{{ loop.index }}</td>
+      <td>{{ m.title }}{% if m.original_title and m.original_title != m.title %}<br><span style="color:var(--dim);font-size:12px">{{ m.original_title }}</span>{% endif %}</td>
+      <td data-value="{{ m.year or 0 }}">{{ m.year or '-' }}</td>
+      <td data-value="{{ m.rating or 0 }}">{% if m.rating %}{{ '%.1f' % m.rating }}{% else %}-{% endif %}</td>
+      <td data-value="{{ m.imdb_rating or 0 }}">{% if m.imdb_rating %}<span style="color:var(--yellow)">⭐ {{ '%.1f' % m.imdb_rating }}</span>{% if m.imdb_votes %}<br><span style="font-size:11px;color:var(--dim)">{{ '{:,}'.format(m.imdb_votes) }}票</span>{% endif %}{% else %}-{% endif %}</td>
+      <td>{% if m.imdb_id %}<a href="https://www.imdb.com/title/{{ m.imdb_id }}/" target="_blank">{{ m.imdb_id }}</a>{% else %}-{% endif %}</td>
+      <td data-value="{{ m.video_resolution or '' }}">{% if m.resolution_label == '4K' %}<span style="color:var(--yellow);font-weight:600">4K</span>{% elif m.resolution_label == '1080p' %}<span style="color:var(--green)">1080p</span>{% elif m.resolution_label == '720p' %}<span style="color:var(--accent)">720p</span>{% else %}<span style="color:var(--dim)">{{ m.resolution_label }}</span>{% endif %}</td>
+      <td>{% if m.in_imdb250 %}<span class="badge badge-yes">✓ IMDB</span>{% else %}<span class="badge badge-no">-</span>{% endif %}</td>
+      <td>{% if m.in_douban250 %}<span class="badge badge-yes">✓ 豆瓣</span>{% else %}<span class="badge badge-no">-</span>{% endif %}</td>
+      <td style="color:var(--dim);font-size:13px">{{ m.directors or '-' }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<script>
+// Tab 切换
+function switchTab(i) {
+  document.querySelectorAll('.tab').forEach((t,j) => t.classList.toggle('active', j===i));
+  document.querySelectorAll('.panel').forEach((p,j) => p.classList.toggle('active', j===i));
+}
+
+// 排序状态
+let sortCol = '';
+let sortDir = 'asc';
+
+function sortTable(th) {
+  const col = th.dataset.col;
+  const table = document.getElementById('embyTable');
+  const tbody = table.querySelector('tbody');
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+
+  if (sortCol === col) {
+    sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    sortCol = col;
+    sortDir = 'asc';
+  }
+
+  table.querySelectorAll('th.sortable').forEach(t => t.classList.remove('sorted-asc', 'sorted-desc'));
+  th.classList.add(sortDir === 'asc' ? 'sorted-asc' : 'sorted-desc');
+
+  const colIndex = {title:1, year:2, rating:3, imdb_rating:4, imdb_id:5, resolution:6}[col];
+  rows.sort((a, b) => {
+    let va, vb;
+    if (col === 'title') {
+      va = a.cells[colIndex].textContent.trim().toLowerCase();
+      vb = b.cells[colIndex].textContent.trim().toLowerCase();
+      return sortDir === 'asc' ? va.localeCompare(vb, 'zh') : vb.localeCompare(va, 'zh');
+    } else if (col === 'year' || col === 'rating' || col === 'imdb_rating') {
+      va = parseFloat(a.cells[colIndex].dataset.value) || 0;
+      vb = parseFloat(b.cells[colIndex].dataset.value) || 0;
+      return sortDir === 'asc' ? va - vb : vb - va;
+    } else if (col === 'resolution') {
+      // 按高度排序：4K > 1080p > 720p > 480p
+      const order = {'4K': 4, '1080p': 3, '720p': 2, '480p': 1};
+      va = order[a.cells[colIndex].textContent.trim()] || 0;
+      vb = order[b.cells[colIndex].textContent.trim()] || 0;
+      return sortDir === 'asc' ? va - vb : vb - va;
+    } else {
+      va = a.cells[colIndex].textContent.trim();
+      vb = b.cells[colIndex].textContent.trim();
+      return sortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+    }
+  });
+
+  rows.forEach(row => tbody.appendChild(row));
+  updateNumbers();
+}
+
+// 筛选
+function applyFilters() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  const filter = document.querySelector('input[name="filter250"]:checked').value;
+  const rows = document.querySelectorAll('#embyTable tbody tr');
+  let visible = 0;
+
+  rows.forEach(row => {
+    const title = row.cells[1].textContent.toLowerCase();
+    const inImdb = row.dataset.imdb250 === '1';
+    const inDouban = row.dataset.douban250 === '1';
+
+    let show = title.includes(q);
+    if (filter === 'imdb') {
+      show = show && inImdb;
+    } else if (filter === 'douban') {
+      show = show && inDouban;
+    } else if (filter === 'both') {
+      show = show && inImdb && inDouban;
+    }
+
+    row.style.display = show ? '' : 'none';
+    if (show) visible++;
+  });
+
+  document.getElementById('embyCount').textContent = `显示 ${visible} / {{ emby_movies|length }} 部电影 | 点击表头排序`;
+
+  // 筛选后重新应用排序
+  applyDefaultSort();
+}
+
+// 默认排序函数
+function applyDefaultSort() {
+  const table = document.getElementById('embyTable');
+  const tbody = table.querySelector('tbody');
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+  const colIndex = 4; // imdb_rating 列索引
+
+  rows.sort((a, b) => {
+    const va = parseFloat(a.cells[colIndex].dataset.value) || 0;
+    const vb = parseFloat(b.cells[colIndex].dataset.value) || 0;
+    return vb - va; // 降序
+  });
+
+  rows.forEach(row => tbody.appendChild(row));
+  updateNumbers();
+}
+
+function updateNumbers() {
+  const rows = document.querySelectorAll('#embyTable tbody tr');
+  let i = 1;
+  rows.forEach(row => {
+    if (row.style.display !== 'none') {
+      row.cells[0].textContent = i++;
+    }
+  });
+}
+
+// ========== 更新功能 ==========
+const LABELS = {'emby': 'Emby清单', 'imdb': 'IMDB 250', 'douban': '豆瓣250'};
+
+function triggerUpdate(type) {
+  const btn = document.getElementById('btn-' + type);
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> 执行中...';
+  showStatus('running', '正在更新' + LABELS[type] + '...');
+
+  fetch('/api/update/' + type, {'method': 'POST'})
+    .then(r => r.json())
+    .then(data => {
+      if (data.status === 'busy') {
+        showStatus('running', '任务正在执行中，请稍候...');
+      }
+      pollStatus(type);
+    })
+    .catch(err => {
+      btn.disabled = false;
+      btn.innerHTML = '🔄 更新' + LABELS[type];
+      showStatus('error', '请求失败: ' + err);
+    });
+}
+
+function pollStatus(type) {
+  const btn = document.getElementById('btn-' + type);
+
+  const timer = setInterval(() => {
+    fetch('/api/status').then(r => r.json()).then(status => {
+      const s = status[type];
+      if (!s) return;
+
+      if (s.status === 'done') {
+        clearInterval(timer);
+        btn.disabled = false;
+        btn.innerHTML = '🔄 更新' + LABELS[type];
+        showStatus('done', s.message);
+        setTimeout(() => location.reload(), 1500);
+      } else if (s.status === 'error') {
+        clearInterval(timer);
+        btn.disabled = false;
+        btn.innerHTML = '🔄 更新' + LABELS[type];
+        showStatus('error', s.message);
+      } else {
+        showStatus('running', s.message);
+      }
+    });
+  }, 2000);
+}
+
+function showStatus(type, msg) {
+  const bar = document.getElementById('statusBar');
+  bar.innerHTML = `<span class="status-msg status-${type}">${msg}</span>`;
+}
+
+// 页面加载时应用默认筛选和排序
+window.addEventListener('DOMContentLoaded', function() {
+  // 设置排序状态为降序
+  sortCol = 'imdb_rating';
+  sortDir = 'desc';
+  // 添加排序样式
+  const imdbRatingTh = document.querySelector('th[data-col="imdb_rating"]');
+  if (imdbRatingTh) {
+    imdbRatingTh.classList.add('sorted-desc');
+  }
+  // 应用筛选（会自动调用排序）
+  applyFilters();
+});
+</script>
+</body>
+</html>

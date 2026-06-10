@@ -1,0 +1,7 @@
+# 核心依赖
+flask>=3.0
+pymysql>=1.1
+requests>=2.31
+
+# 生产环境 WSGI 服务器
+gunicorn>=21.2

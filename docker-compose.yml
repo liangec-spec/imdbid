@@ -1,0 +1,43 @@
+# 开发环境配置
+# 使用方法: docker compose up -d
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: emby-movies-db
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-root123}
+      MYSQL_DATABASE: douban_top250
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./sql/schema.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    container_name: emby-movies-app
+    ports:
+      - "5000:5000"
+    environment:
+      DB_HOST: db
+      DB_USER: root
+      DB_PASSWORD: ${DB_PASSWORD:-root123}
+      DB_NAME: douban_top250
+      EMBY_SERVER: ${EMBY_SERVER:-http://localhost:8096}
+      EMBY_API_KEY: ${EMBY_API_KEY:-}
+      EMBY_PARENT_ID: ${EMBY_PARENT_ID:-}
+    volumes:
+      - ./data:/app/data
+      - ./scripts:/app/scripts  # 开发时挂载脚本目录，方便修改
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  mysql-data:
