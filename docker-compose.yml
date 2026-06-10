@@ -21,6 +21,7 @@ services:
     restart: always
     ports:
       - "8097:5000"
+    mem_limit: 1g  # 增加内存限制到 1GB
     environment:
       DB_HOST: db
       DB_USER: root
