@@ -1,9 +1,6 @@
 -- Emby 电影管理系统 - 数据库结构
 -- 数据库名: douban_top250
-
-CREATE DATABASE IF NOT EXISTS douban_top250
-    CHARACTER SET utf8mb4
-    COLLATE utf8mb4_unicode_ci;
+-- 注意: 数据库由 MySQL Docker 镜像自动创建 (MYSQL_DATABASE 环境变量)
 
 USE douban_top250;
 
