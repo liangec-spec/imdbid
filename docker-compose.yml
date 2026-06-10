@@ -8,6 +8,7 @@ services:
       MYSQL_DATABASE: douban_top250
     volumes:
       - mysql-data:/var/lib/mysql
+      - ./sql/schema.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 30s
