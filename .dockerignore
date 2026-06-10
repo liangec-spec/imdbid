@@ -1,36 +1,37 @@
-# Python
+# Python 缓存
 __pycache__/
-*.py[cod]
-*$py.class
-*.so
+*.pyc
+*.pyo
 
-# Virtual environments
+# 虚拟环境
 venv/
 .venv/
-env/
 
 # IDE
 .vscode/
 .idea/
 
-# Generated files
+# 生成的数据文件
 data/*.csv
-*.csv
-!douban-scraper/top250.csv
+
+# 日志
 *.log
 
 # Claude Code
 .claude/
 
-# Docker
-Dockerfile
-docker-compose.yml
-.dockerignore
-
-# OS files
-.DS_Store
-Thumbs.db
-
 # Git
 .git/
-.gitignore
+
+# Docker
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# 文档
+*.md
+
+# 其他
+.DS_Store
+Thumbs.db
+secrets/

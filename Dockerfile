@@ -1,14 +1,5 @@
-# ============ 阶段 1: 编译 Go 程序 ============
-FROM golang:1.21-alpine AS go-builder
-
-WORKDIR /build
-COPY douban-scraper/ .
-RUN go build -ldflags="-s -w" -o douban-scraper .
-
-# ============ 阶段 2: 生产镜像 ============
 FROM python:3.12-slim
 
-# 设置环境变量
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
@@ -34,9 +25,6 @@ COPY config/ config/
 COPY scripts/ scripts/
 COPY web/ web/
 COPY sql/ sql/
-
-# 从 Go 构建阶段复制编译好的程序
-COPY --from=go-builder /build/douban-scraper douban-scraper/douban-scraper
 
 # 创建数据目录并设置权限
 RUN mkdir -p /app/data && chown -R appuser:appuser /app
