@@ -46,20 +46,21 @@ def fetch_top250_list():
             continue
 
         # 解析 HTML
-        # 提取电影信息: <li> 标签内的内容
-        # 排名: <em class="">1</em>
-        # 名称: <img ... alt="电影名" />
-        # 链接: <div class="hd"><a href="https://movie.douban.com/subject/xxx/" ...>
+        # 实际结构:
+        # <div class="pic">
+        #     <em>1</em>
+        #     <a href="https://movie.douban.com/subject/1292052/">
+        #         <img ... alt="肖申克的救赎" ...>
+        #     </a>
+        # </div>
 
         items = re.findall(
-            r'<li>.*?<div class="pic">.*?<em class="">(\d+)</em>.*?'
-            r'<img.*?alt="(.*?)".*?'
-            r'<div class="hd"><a href="(https://movie\.douban\.com/subject/\d+/)"',
+            r'<em>(\d+)</em>.*?<a href="(https://movie\.douban\.com/subject/\d+/)".*?alt="(.*?)"',
             resp.text,
             re.DOTALL
         )
 
-        for rank_str, name, link in items:
+        for rank_str, link, name in items:
             rank = int(rank_str)
             if 1 <= rank <= 250:
                 movies[rank - 1] = {"name": name, "link": link, "imdb_id": ""}
