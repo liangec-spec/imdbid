@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - 'v*'
+    branches:
+      - 'feature/**'
 
 jobs:
   build:
@@ -24,9 +26,16 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Extract version from tag
-        id: version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+      - name: Generate tag
+        id: tag
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          else
+            BRANCH=${GITHUB_REF#refs/heads/}
+            BRANCH=${BRANCH//\//-}
+            echo "TAG=${BRANCH}-$(echo $GITHUB_SHA | head -c 7)" >> $GITHUB_OUTPUT
+          fi
 
       - name: Build and push
         uses: docker/build-push-action@v5
@@ -35,7 +44,6 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ${{ secrets.DOCKER_USERNAME }}/emby-movies:${{ steps.version.outputs.VERSION }}
-            ${{ secrets.DOCKER_USERNAME }}/emby-movies:latest
+            ${{ secrets.DOCKER_USERNAME }}/emby-movies:${{ steps.tag.outputs.TAG }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
