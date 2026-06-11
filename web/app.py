@@ -7,7 +7,7 @@ import sys
 import subprocess
 import threading
 
-from flask import Flask, render_template, jsonify
+from flask import Flask, render_template, jsonify, request
 import pymysql
 
 # 添加项目根目录到 path
@@ -63,28 +63,91 @@ def run_task(task_name, cmd, cwd=None):
 
 @app.route("/")
 def index():
-    douban_missing = query("""
-        SELECT m.ranking, m.title, m.imdb_id, m.douban_link
-        FROM douban_top250 m
+    # 统计数据
+    douban_total = query("SELECT COUNT(*) AS c FROM douban_top250")[0]["c"]
+    imdb_total = query("SELECT COUNT(*) AS c FROM imdb_top250")[0]["c"]
+    emby_total = query("SELECT COUNT(*) AS c FROM emby_movies")[0]["c"]
+
+    douban_missing_count = query("""
+        SELECT COUNT(*) AS c FROM douban_top250 m
         WHERE NOT EXISTS (
             SELECT 1 FROM emby_movies e
             WHERE e.title LIKE CONCAT(m.title, '%')
                OR m.title LIKE CONCAT(e.title, '%')
         )
-        ORDER BY m.ranking
-    """)
+    """)[0]["c"]
 
-    imdb_missing = query("""
-        SELECT i.imdb_id, i.title
-        FROM imdb_top250 i
+    imdb_missing_count = query("""
+        SELECT COUNT(*) AS c FROM imdb_top250 i
         WHERE i.imdb_id NOT IN (SELECT imdb_id FROM emby_movies WHERE imdb_id IS NOT NULL AND imdb_id != '')
-        ORDER BY i.id
-    """)
+    """)[0]["c"]
 
-    douban_total = query("SELECT COUNT(*) AS c FROM douban_top250")[0]["c"]
-    imdb_total = query("SELECT COUNT(*) AS c FROM imdb_top250")[0]["c"]
+    return render_template(
+        "index.html",
+        douban_total=douban_total,
+        imdb_total=imdb_total,
+        emby_total=emby_total,
+        douban_missing_count=douban_missing_count,
+        imdb_missing_count=imdb_missing_count,
+    )
 
-    emby_movies = query("""
+
+@app.route("/api/movies")
+def api_movies():
+    """分页获取电影列表"""
+    page = request.args.get("page", 1, type=int)
+    per_page = request.args.get("per_page", 50, type=int)
+    search = request.args.get("search", "", type=str)
+    sort_by = request.args.get("sort_by", "imdb_rating", type=str)
+    sort_order = request.args.get("sort_order", "desc", type=str)
+    filter_type = request.args.get("filter", "all", type=str)
+
+    # 限制每页数量
+    per_page = min(per_page, 100)
+
+    # 构建查询
+    where_clauses = []
+    params = []
+
+    if search:
+        where_clauses.append("(e.title LIKE %s OR e.original_title LIKE %s OR e.imdb_id LIKE %s)")
+        search_param = f"%{search}%"
+        params.extend([search_param, search_param, search_param])
+
+    where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"
+
+    # 排序字段映射
+    sort_fields = {
+        "title": "e.title",
+        "year": "e.year",
+        "rating": "e.rating",
+        "imdb_rating": "e.imdb_rating",
+        "imdb_votes": "e.imdb_votes",
+    }
+    order_field = sort_fields.get(sort_by, "e.imdb_rating")
+    order_dir = "DESC" if sort_order == "desc" else "ASC"
+
+    # 构建篩选 JOIN 和 WHERE
+    if filter_type in ("imdb", "both"):
+        imdb_join = "INNER JOIN imdb_top250 i ON e.imdb_id = i.imdb_id"
+    else:
+        imdb_join = "LEFT JOIN imdb_top250 i ON e.imdb_id = i.imdb_id"
+
+    douban_filter = ""
+    if filter_type in ("douban", "both"):
+        douban_filter = """AND EXISTS (
+            SELECT 1 FROM douban_top250 m
+            WHERE m.title LIKE CONCAT(e.title, '%%') OR e.title LIKE CONCAT(m.title, '%%')
+        )"""
+
+    # 获取总数
+    count_sql = "SELECT COUNT(*) AS total FROM emby_movies e {} WHERE {} {}".format(imdb_join, where_sql, douban_filter)
+    total = query(count_sql, params)[0]["total"]
+
+    # 获取分页数据
+    offset = (page - 1) * per_page
+
+    data_sql = """
         SELECT
             e.title, e.original_title, e.year, e.imdb_id, e.rating,
             e.imdb_rating, e.imdb_votes,
@@ -98,22 +161,51 @@ def index():
             CASE WHEN i.imdb_id IS NOT NULL THEN 1 ELSE 0 END AS in_imdb250,
             CASE WHEN EXISTS (
                 SELECT 1 FROM douban_top250 m
-                WHERE m.title LIKE CONCAT(e.title, '%')
-                   OR e.title LIKE CONCAT(m.title, '%')
+                WHERE m.title LIKE CONCAT(e.title, '%%')
+                   OR e.title LIKE CONCAT(m.title, '%%')
             ) THEN 1 ELSE 0 END AS in_douban250
         FROM emby_movies e
-        LEFT JOIN imdb_top250 i ON e.imdb_id = i.imdb_id
-        ORDER BY e.title
-    """)
+        {}
+        WHERE {} {}
+        ORDER BY {} {}
+        LIMIT %s OFFSET %s
+    """.format(imdb_join, where_sql, douban_filter, order_field, order_dir)
+    movies = query(data_sql, params + [per_page, offset])
 
-    return render_template(
-        "index.html",
-        douban_missing=douban_missing,
-        imdb_missing=imdb_missing,
-        douban_total=douban_total,
-        imdb_total=imdb_total,
-        emby_movies=emby_movies,
-    )
+    return jsonify({
+        "movies": movies,
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "total_pages": (total + per_page - 1) // per_page,
+    })
+
+
+@app.route("/api/movies/missing")
+def api_missing_movies():
+    """获取缺失电影列表"""
+    type = request.args.get("type", "imdb", type=str)
+
+    if type == "douban":
+        movies = query("""
+            SELECT m.ranking, m.title, m.imdb_id, m.douban_link
+            FROM douban_top250 m
+            WHERE NOT EXISTS (
+                SELECT 1 FROM emby_movies e
+                WHERE e.title LIKE CONCAT(m.title, '%')
+                   OR m.title LIKE CONCAT(e.title, '%')
+            )
+            ORDER BY m.ranking
+        """)
+    else:
+        movies = query("""
+            SELECT i.imdb_id, i.title
+            FROM imdb_top250 i
+            WHERE i.imdb_id NOT IN (SELECT imdb_id FROM emby_movies WHERE imdb_id IS NOT NULL AND imdb_id != '')
+            ORDER BY i.id
+        """)
+
+    return jsonify({"movies": movies})
 
 
 @app.route("/api/update/emby", methods=["POST"])

@@ -55,9 +55,16 @@
   .filters { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
   .filters label { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 14px; color: var(--dim); }
   .filters label:hover { color: var(--text); }
-  .filters input[type="checkbox"] { accent-color: var(--accent); width: 16px; height: 16px; }
   .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(0,0,0,.3); border-top-color: #000; border-radius: 50%; animation: spin .6s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
+  /* 分页样式 */
+  .pagination { display: flex; justify-content: center; align-items: center; gap: 8px; margin: 20px 0; }
+  .pagination button { background: var(--card); color: var(--text); border: 1px solid rgba(255,255,255,.1); padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px; transition: all .2s; }
+  .pagination button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  .pagination button:disabled { opacity: .4; cursor: not-allowed; }
+  .pagination button.active { background: var(--accent); color: #000; border-color: var(--accent); }
+  .pagination .page-info { color: var(--dim); font-size: 14px; }
+  .loading { text-align: center; padding: 40px; color: var(--dim); }
   @media (max-width: 768px) {
     .stats { flex-direction: column; align-items: center; }
     td, th { padding: 8px 10px; font-size: 13px; }
@@ -82,227 +89,243 @@
 
 <div class="stats">
   <div class="stat">
-    <div class="num">{{ douban_missing|length }}<span style="font-size:18px;color:var(--dim)"> / {{ douban_total }}</span></div>
+    <div class="num" id="doubanMissing">{{ douban_missing_count }}<span style="font-size:18px;color:var(--dim)"> / {{ douban_total }}</span></div>
     <div class="label">豆瓣 Top250 缺失</div>
   </div>
   <div class="stat">
-    <div class="num">{{ imdb_missing|length }}<span style="font-size:18px;color:var(--dim)"> / {{ imdb_total }}</span></div>
+    <div class="num" id="imdbMissing">{{ imdb_missing_count }}<span style="font-size:18px;color:var(--dim)"> / {{ imdb_total }}</span></div>
     <div class="label">IMDB Top250 缺失</div>
   </div>
   <div class="stat">
-    <div class="num">{{ emby_movies|length }}</div>
+    <div class="num" id="embyTotal">{{ emby_total }}</div>
     <div class="label">Emby 电影总数</div>
   </div>
 </div>
 
 <div class="tabs">
-  <div class="tab" onclick="switchTab(0)">📘 豆瓣缺失 ({{ douban_missing|length }})</div>
-  <div class="tab" onclick="switchTab(1)">📙 IMDB 缺失 ({{ imdb_missing|length }})</div>
-  <div class="tab active" onclick="switchTab(2)">🎬 Emby 清单 ({{ emby_movies|length }})</div>
+  <div class="tab" onclick="switchTab(0)">📘 豆瓣缺失</div>
+  <div class="tab" onclick="switchTab(1)">📙 IMDB 缺失</div>
+  <div class="tab active" onclick="switchTab(2)">🎬 Emby 清单</div>
 </div>
 
 <!-- 豆瓣缺失 -->
 <div class="panel" id="panel-0">
-  {% if douban_missing %}
-  <div class="count">共 {{ douban_missing|length }} 部电影在 Emby 库中缺失</div>
-  <table>
+  <div class="loading" id="doubanLoading">加载中...</div>
+  <table id="doubanTable" style="display:none">
     <thead><tr><th>#</th><th>排名</th><th>电影名称</th><th>IMDB ID</th></tr></thead>
-    <tbody>
-    {% for m in douban_missing %}
-    <tr>
-      <td>{{ loop.index }}</td>
-      <td>{{ m.ranking }}</td>
-      <td><a href="{{ m.douban_link }}" target="_blank">{{ m.title }}</a></td>
-      <td>{% if m.imdb_id %}<a href="https://www.imdb.com/title/{{ m.imdb_id }}/" target="_blank">{{ m.imdb_id }}</a>{% else %}-{% endif %}</td>
-    </tr>
-    {% endfor %}
-    </tbody>
+    <tbody></tbody>
   </table>
-  {% else %}
-  <div class="count" style="color:var(--green)">🎉 你的 Emby 库已拥有豆瓣 Top 250 全部电影！</div>
-  {% endif %}
 </div>
 
 <!-- IMDB 缺失 -->
 <div class="panel" id="panel-1">
-  {% if imdb_missing %}
-  <div class="count">共 {{ imdb_missing|length }} 部电影在 Emby 库中缺失</div>
-  <table>
+  <div class="loading" id="imdbLoading">加载中...</div>
+  <table id="imdbTable" style="display:none">
     <thead><tr><th>#</th><th>电影名称</th><th>IMDB ID</th></tr></thead>
-    <tbody>
-    {% for m in imdb_missing %}
-    <tr>
-      <td>{{ loop.index }}</td>
-      <td>{{ m.title }}</td>
-      <td><a href="https://www.imdb.com/title/{{ m.imdb_id }}/" target="_blank">{{ m.imdb_id }}</a></td>
-    </tr>
-    {% endfor %}
-    </tbody>
+    <tbody></tbody>
   </table>
-  {% else %}
-  <div class="count" style="color:var(--green)">🎉 你的 Emby 库已拥有 IMDB Top 250 全部电影！</div>
-  {% endif %}
 </div>
 
 <!-- Emby 电影清单 -->
 <div class="panel active" id="panel-2">
   <div class="toolbar">
     <div class="search-box">
-      <input type="text" id="searchInput" placeholder="🔍 搜索电影名称..." oninput="applyFilters()">
+      <input type="text" id="searchInput" placeholder="🔍 搜索电影名称或 IMDB ID..." oninput="debounceSearch()">
     </div>
     <div class="filters">
-      <label><input type="radio" name="filter250" value="all" onchange="applyFilters()" checked> 全部</label>
-      <label><input type="radio" name="filter250" value="imdb" onchange="applyFilters()"> 仅 IMDB 250</label>
-      <label><input type="radio" name="filter250" value="douban" onchange="applyFilters()"> 仅豆瓣 250</label>
-      <label><input type="radio" name="filter250" value="both" onchange="applyFilters()"> 两者都在 250</label>
+      <label><input type="radio" name="filter250" value="all" onchange="loadMovies(1)" checked> 全部</label>
+      <label><input type="radio" name="filter250" value="imdb" onchange="loadMovies(1)"> 仅 IMDB 250</label>
+      <label><input type="radio" name="filter250" value="douban" onchange="loadMovies(1)"> 仅豆瓣 250</label>
+      <label><input type="radio" name="filter250" value="both" onchange="loadMovies(1)"> 两者都在 250</label>
     </div>
   </div>
-  <div class="count" id="embyCount">共 {{ emby_movies|length }} 部电影 | 点击表头排序</div>
+  <div class="count" id="embyCount">加载中...</div>
   <table id="embyTable">
     <thead>
       <tr>
         <th>#</th>
-        <th class="sortable" data-col="title" onclick="sortTable(this)">电影名称 <span class="arrow up">▲</span><span class="arrow down">▼</span></th>
-        <th class="sortable" data-col="year" onclick="sortTable(this)">年份 <span class="arrow up">▲</span><span class="arrow down">▼</span></th>
-        <th class="sortable" data-col="rating" onclick="sortTable(this)">评分 <span class="arrow up">▲</span><span class="arrow down">▼</span></th>
-        <th class="sortable" data-col="imdb_rating" onclick="sortTable(this)">IMDB评分 <span class="arrow up">▲</span><span class="arrow down">▼</span></th>
-        <th class="sortable" data-col="imdb_id" onclick="sortTable(this)">IMDB ID <span class="arrow up">▲</span><span class="arrow down">▼</span></th>
-        <th class="sortable" data-col="resolution" onclick="sortTable(this)">分辨率 <span class="arrow up">▲</span><span class="arrow down">▼</span></th>
+        <th class="sortable" data-col="title" onclick="changeSort('title')">电影名称 <span class="arrow up">▲</span><span class="arrow down">▼</span></th>
+        <th class="sortable" data-col="year" onclick="changeSort('year')">年份 <span class="arrow up">▲</span><span class="arrow down">▼</span></th>
+        <th class="sortable" data-col="rating" onclick="changeSort('rating')">评分 <span class="arrow up">▲</span><span class="arrow down">▼</span></th>
+        <th class="sortable" data-col="imdb_rating" onclick="changeSort('imdb_rating')">IMDB评分 <span class="arrow up">▲</span><span class="arrow down">▼</span></th>
+        <th>IMDB ID</th>
+        <th>分辨率</th>
         <th>IMDB 250</th>
         <th>豆瓣 250</th>
         <th>导演</th>
       </tr>
     </thead>
-    <tbody>
-    {% for m in emby_movies %}
-    <tr data-imdb250="{{ m.in_imdb250 }}" data-douban250="{{ m.in_douban250 }}">
-      <td>{{ loop.index }}</td>
-      <td>{{ m.title }}{% if m.original_title and m.original_title != m.title %}<br><span style="color:var(--dim);font-size:12px">{{ m.original_title }}</span>{% endif %}</td>
-      <td data-value="{{ m.year or 0 }}">{{ m.year or '-' }}</td>
-      <td data-value="{{ m.rating or 0 }}">{% if m.rating %}{{ '%.1f' % m.rating }}{% else %}-{% endif %}</td>
-      <td data-value="{{ m.imdb_rating or 0 }}">{% if m.imdb_rating %}<span style="color:var(--yellow)">⭐ {{ '%.1f' % m.imdb_rating }}</span>{% if m.imdb_votes %}<br><span style="font-size:11px;color:var(--dim)">{{ '{:,}'.format(m.imdb_votes) }}票</span>{% endif %}{% else %}-{% endif %}</td>
-      <td>{% if m.imdb_id %}<a href="https://www.imdb.com/title/{{ m.imdb_id }}/" target="_blank">{{ m.imdb_id }}</a>{% else %}-{% endif %}</td>
-      <td data-value="{{ m.video_resolution or '' }}">{% if m.resolution_label == '4K' %}<span style="color:var(--yellow);font-weight:600">4K</span>{% elif m.resolution_label == '1080p' %}<span style="color:var(--green)">1080p</span>{% elif m.resolution_label == '720p' %}<span style="color:var(--accent)">720p</span>{% else %}<span style="color:var(--dim)">{{ m.resolution_label }}</span>{% endif %}</td>
-      <td>{% if m.in_imdb250 %}<span class="badge badge-yes">✓ IMDB</span>{% else %}<span class="badge badge-no">-</span>{% endif %}</td>
-      <td>{% if m.in_douban250 %}<span class="badge badge-yes">✓ 豆瓣</span>{% else %}<span class="badge badge-no">-</span>{% endif %}</td>
-      <td style="color:var(--dim);font-size:13px">{{ m.directors or '-' }}</td>
-    </tr>
-    {% endfor %}
+    <tbody id="embyTbody">
     </tbody>
   </table>
+  <div class="pagination" id="pagination"></div>
 </div>
 
 <script>
+// 状态
+let currentPage = 1;
+let sortBy = 'imdb_rating';
+let sortOrder = 'desc';
+let searchTimer = null;
+
 // Tab 切换
 function switchTab(i) {
   document.querySelectorAll('.tab').forEach((t,j) => t.classList.toggle('active', j===i));
   document.querySelectorAll('.panel').forEach((p,j) => p.classList.toggle('active', j===i));
+
+  // 懒加载缺失列表
+  if (i === 0) loadMissing('douban');
+  if (i === 1) loadMissing('imdb');
 }
 
-// 排序状态
-let sortCol = '';
-let sortDir = 'asc';
+// 防抖搜索
+function debounceSearch() {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => loadMovies(1), 300);
+}
 
-function sortTable(th) {
-  const col = th.dataset.col;
-  const table = document.getElementById('embyTable');
-  const tbody = table.querySelector('tbody');
-  const rows = Array.from(tbody.querySelectorAll('tr'));
-
-  if (sortCol === col) {
-    sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+// 切换排序
+function changeSort(col) {
+  if (sortBy === col) {
+    sortOrder = sortOrder === 'asc' ? 'desc' : 'asc';
   } else {
-    sortCol = col;
-    sortDir = 'asc';
+    sortBy = col;
+    sortOrder = 'desc';
   }
 
-  table.querySelectorAll('th.sortable').forEach(t => t.classList.remove('sorted-asc', 'sorted-desc'));
-  th.classList.add(sortDir === 'asc' ? 'sorted-asc' : 'sorted-desc');
-
-  const colIndex = {title:1, year:2, rating:3, imdb_rating:4, imdb_id:5, resolution:6}[col];
-  rows.sort((a, b) => {
-    let va, vb;
-    if (col === 'title') {
-      va = a.cells[colIndex].textContent.trim().toLowerCase();
-      vb = b.cells[colIndex].textContent.trim().toLowerCase();
-      return sortDir === 'asc' ? va.localeCompare(vb, 'zh') : vb.localeCompare(va, 'zh');
-    } else if (col === 'year' || col === 'rating' || col === 'imdb_rating') {
-      va = parseFloat(a.cells[colIndex].dataset.value) || 0;
-      vb = parseFloat(b.cells[colIndex].dataset.value) || 0;
-      return sortDir === 'asc' ? va - vb : vb - va;
-    } else if (col === 'resolution') {
-      // 按高度排序：4K > 1080p > 720p > 480p
-      const order = {'4K': 4, '1080p': 3, '720p': 2, '480p': 1};
-      va = order[a.cells[colIndex].textContent.trim()] || 0;
-      vb = order[b.cells[colIndex].textContent.trim()] || 0;
-      return sortDir === 'asc' ? va - vb : vb - va;
-    } else {
-      va = a.cells[colIndex].textContent.trim();
-      vb = b.cells[colIndex].textContent.trim();
-      return sortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+  // 更新表头样式
+  document.querySelectorAll('#embyTable th.sortable').forEach(th => {
+    th.classList.remove('sorted-asc', 'sorted-desc');
+    if (th.dataset.col === sortBy) {
+      th.classList.add(sortOrder === 'asc' ? 'sorted-asc' : 'sorted-desc');
     }
   });
 
-  rows.forEach(row => tbody.appendChild(row));
-  updateNumbers();
+  loadMovies(1);
 }
 
-// 筛选
-function applyFilters() {
-  const q = document.getElementById('searchInput').value.toLowerCase();
+// 加载电影列表
+function loadMovies(page) {
+  currentPage = page;
+  const search = document.getElementById('searchInput').value;
   const filter = document.querySelector('input[name="filter250"]:checked').value;
-  const rows = document.querySelectorAll('#embyTable tbody tr');
-  let visible = 0;
 
-  rows.forEach(row => {
-    const title = row.cells[1].textContent.toLowerCase();
-    const inImdb = row.dataset.imdb250 === '1';
-    const inDouban = row.dataset.douban250 === '1';
-
-    let show = title.includes(q);
-    if (filter === 'imdb') {
-      show = show && inImdb;
-    } else if (filter === 'douban') {
-      show = show && inDouban;
-    } else if (filter === 'both') {
-      show = show && inImdb && inDouban;
-    }
-
-    row.style.display = show ? '' : 'none';
-    if (show) visible++;
+  const params = new URLSearchParams({
+    page: page,
+    per_page: 50,
+    search: search,
+    sort_by: sortBy,
+    sort_order: sortOrder,
+    filter: filter,
   });
 
-  document.getElementById('embyCount').textContent = `显示 ${visible} / {{ emby_movies|length }} 部电影 | 点击表头排序`;
-
-  // 筛选后重新应用排序
-  applyDefaultSort();
+  fetch(`/api/movies?${params}`)
+    .then(r => r.json())
+    .then(data => {
+      renderMovies(data.movies);
+      renderPagination(data.page, data.total_pages, data.total);
+      document.getElementById('embyCount').textContent =
+        `共 ${data.total} 部电影 | 第 ${data.page}/${data.total_pages} 页`;
+    });
 }
 
-// 默认排序函数
-function applyDefaultSort() {
-  const table = document.getElementById('embyTable');
-  const tbody = table.querySelector('tbody');
-  const rows = Array.from(tbody.querySelectorAll('tr'));
-  const colIndex = 4; // imdb_rating 列索引
-
-  rows.sort((a, b) => {
-    const va = parseFloat(a.cells[colIndex].dataset.value) || 0;
-    const vb = parseFloat(b.cells[colIndex].dataset.value) || 0;
-    return vb - va; // 降序
-  });
-
-  rows.forEach(row => tbody.appendChild(row));
-  updateNumbers();
+// 渲染电影列表
+function renderMovies(movies) {
+  const tbody = document.getElementById('embyTbody');
+  tbody.innerHTML = movies.map((m, i) => `
+    <tr>
+      <td>${(currentPage - 1) * 50 + i + 1}</td>
+      <td>${m.title}${m.original_title && m.original_title !== m.title ? `<br><span style="color:var(--dim);font-size:12px">${m.original_title}</span>` : ''}</td>
+      <td>${m.year || '-'}</td>
+      <td>${m.rating ? parseFloat(m.rating).toFixed(1) : '-'}</td>
+      <td>${m.imdb_rating ? `<span style="color:var(--yellow)">⭐ ${parseFloat(m.imdb_rating).toFixed(1)}</span>${m.imdb_votes ? `<br><span style="font-size:11px;color:var(--dim)">${m.imdb_votes.toLocaleString()}票</span>` : ''}` : '-'}</td>
+      <td>${m.imdb_id ? `<a href="https://www.imdb.com/title/${m.imdb_id}/" target="_blank">${m.imdb_id}</a>` : '-'}</td>
+      <td>${formatResolution(m.resolution_label)}</td>
+      <td>${m.in_imdb250 ? '<span class="badge badge-yes">✓ IMDB</span>' : '<span class="badge badge-no">-</span>'}</td>
+      <td>${m.in_douban250 ? '<span class="badge badge-yes">✓ 豆瓣</span>' : '<span class="badge badge-no">-</span>'}</td>
+      <td style="color:var(--dim);font-size:13px">${m.directors || '-'}</td>
+    </tr>
+  `).join('');
 }
 
-function updateNumbers() {
-  const rows = document.querySelectorAll('#embyTable tbody tr');
-  let i = 1;
-  rows.forEach(row => {
-    if (row.style.display !== 'none') {
-      row.cells[0].textContent = i++;
-    }
-  });
+// 格式化分辨率
+function formatResolution(label) {
+  if (label === '4K') return '<span style="color:var(--yellow);font-weight:600">4K</span>';
+  if (label === '1080p') return '<span style="color:var(--green)">1080p</span>';
+  if (label === '720p') return '<span style="color:var(--accent)">720p</span>';
+  return `<span style="color:var(--dim)">${label || '-'}</span>`;
+}
+
+// 渲染分页
+function renderPagination(page, totalPages, total) {
+  const container = document.getElementById('pagination');
+  if (totalPages <= 1) {
+    container.innerHTML = '';
+    return;
+  }
+
+  let html = '';
+  html += `<button ${page <= 1 ? 'disabled' : ''} onclick="loadMovies(${page - 1})">上一页</button>`;
+
+  // 显示页码
+  const start = Math.max(1, page - 2);
+  const end = Math.min(totalPages, page + 2);
+
+  if (start > 1) {
+    html += `<button onclick="loadMovies(1)">1</button>`;
+    if (start > 2) html += '<span class="page-info">...</span>';
+  }
+
+  for (let i = start; i <= end; i++) {
+    html += `<button class="${i === page ? 'active' : ''}" onclick="loadMovies(${i})">${i}</button>`;
+  }
+
+  if (end < totalPages) {
+    if (end < totalPages - 1) html += '<span class="page-info">...</span>';
+    html += `<button onclick="loadMovies(${totalPages})">${totalPages}</button>`;
+  }
+
+  html += `<button ${page >= totalPages ? 'disabled' : ''} onclick="loadMovies(${page + 1})">下一页</button>`;
+
+  container.innerHTML = html;
+}
+
+// 加载缺失列表
+function loadMissing(type) {
+  const loadingId = type === 'douban' ? 'doubanLoading' : 'imdbLoading';
+  const tableId = type === 'douban' ? 'doubanTable' : 'imdbTable';
+
+  fetch(`/api/movies/missing?type=${type}`)
+    .then(r => r.json())
+    .then(data => {
+      document.getElementById(loadingId).style.display = 'none';
+      const table = document.getElementById(tableId);
+      table.style.display = '';
+
+      const tbody = table.querySelector('tbody');
+      if (type === 'douban') {
+        tbody.innerHTML = data.movies.map((m, i) => `
+          <tr>
+            <td>${i + 1}</td>
+            <td>${m.ranking}</td>
+            <td><a href="${m.douban_link}" target="_blank">${m.title}</a></td>
+            <td>${m.imdb_id ? `<a href="https://www.imdb.com/title/${m.imdb_id}/" target="_blank">${m.imdb_id}</a>` : '-'}</td>
+          </tr>
+        `).join('');
+      } else {
+        tbody.innerHTML = data.movies.map((m, i) => `
+          <tr>
+            <td>${i + 1}</td>
+            <td>${m.title}</td>
+            <td><a href="https://www.imdb.com/title/${m.imdb_id}/" target="_blank">${m.imdb_id}</a></td>
+          </tr>
+        `).join('');
+      }
+
+      if (data.movies.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--green)">🎉 你的 Emby 库已拥有${type === 'douban' ? '豆瓣' : 'IMDB'} Top 250 全部电影！</td></tr>`;
+      }
+    });
 }
 
 // ========== 更新功能 ==========
@@ -360,18 +383,11 @@ function showStatus(type, msg) {
   bar.innerHTML = `<span class="status-msg status-${type}">${msg}</span>`;
 }
 
-// 页面加载时应用默认筛选和排序
+// 页面加载
 window.addEventListener('DOMContentLoaded', function() {
-  // 设置排序状态为降序
-  sortCol = 'imdb_rating';
-  sortDir = 'desc';
-  // 添加排序样式
-  const imdbRatingTh = document.querySelector('th[data-col="imdb_rating"]');
-  if (imdbRatingTh) {
-    imdbRatingTh.classList.add('sorted-desc');
-  }
-  // 应用筛选（会自动调用排序）
-  applyFilters();
+  // 默认按 IMDB 评分降序
+  document.querySelector('th[data-col="imdb_rating"]').classList.add('sorted-desc');
+  loadMovies(1);
 });
 </script>
 </body>
