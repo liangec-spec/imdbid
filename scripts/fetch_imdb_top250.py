@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import DB_CONFIG, IMDB_DATASETS, DATA_DIR
 
 # 最少投票数（过滤冷门电影）
-MIN_VOTES = 25000
+MIN_VOTES = 100000
 
 
 def download_and_process_ratings():
