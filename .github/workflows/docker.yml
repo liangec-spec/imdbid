@@ -31,10 +31,12 @@ jobs:
         run: |
           if [[ "$GITHUB_REF" == refs/tags/* ]]; then
             echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+            echo "IS_RELEASE=true" >> $GITHUB_OUTPUT
           else
             BRANCH=${GITHUB_REF#refs/heads/}
             BRANCH=${BRANCH//\//-}
             echo "TAG=${BRANCH}-$(echo $GITHUB_SHA | head -c 7)" >> $GITHUB_OUTPUT
+            echo "IS_RELEASE=false" >> $GITHUB_OUTPUT
           fi
 
       - name: Build and push
@@ -45,5 +47,6 @@ jobs:
           push: true
           tags: |
             ${{ secrets.DOCKER_USERNAME }}/emby-movies:${{ steps.tag.outputs.TAG }}
+            ${{ steps.outputs.IS_RELEASE == 'true' && format('{0}/emby-movies:latest', secrets.DOCKER_USERNAME) || '' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
