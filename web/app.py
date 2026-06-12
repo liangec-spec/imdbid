@@ -268,20 +268,30 @@ def api_top250():
         movies = query("""
             SELECT
                 m.ranking, m.title, m.douban_link, m.imdb_id,
-                CASE WHEN e.imdb_id IS NOT NULL OR e.title IS NOT NULL THEN 1 ELSE 0 END AS in_emby
+                e.year, e.imdb_rating,
+                CASE WHEN EXISTS (
+                    SELECT 1 FROM emby_movies e2
+                    WHERE m.imdb_id = e2.imdb_id
+                       OR e2.title LIKE CONCAT(m.title, '%%')
+                       OR m.title LIKE CONCAT(e2.title, '%%')
+                ) THEN 1 ELSE 0 END AS in_emby
             FROM douban_top250 m
-            LEFT JOIN emby_movies e ON (
-                m.imdb_id = e.imdb_id
-                OR e.title LIKE CONCAT(m.title, '%%')
-                OR m.title LIKE CONCAT(e.title, '%%')
-            )
+            LEFT JOIN emby_movies e ON m.imdb_id = e.imdb_id
             ORDER BY m.ranking
         """)
     else:
         movies = query("""
             SELECT
                 i.title, i.imdb_id,
-                e.imdb_rating AS rating,
+                e.year, e.imdb_rating, e.imdb_votes,
+                e.video_resolution,
+                CASE
+                    WHEN e.video_resolution IS NULL THEN NULL
+                    WHEN CAST(SUBSTRING_INDEX(e.video_resolution, 'x', 1) AS UNSIGNED) >= 3000 THEN '4K'
+                    WHEN CAST(SUBSTRING_INDEX(e.video_resolution, 'x', 1) AS UNSIGNED) >= 1000 THEN '1080p'
+                    WHEN CAST(SUBSTRING_INDEX(e.video_resolution, 'x', 1) AS UNSIGNED) >= 700 THEN '720p'
+                    ELSE e.video_resolution
+                END AS resolution,
                 CASE WHEN e.imdb_id IS NOT NULL THEN 1 ELSE 0 END AS in_emby
             FROM imdb_top250 i
             LEFT JOIN emby_movies e ON i.imdb_id = e.imdb_id
