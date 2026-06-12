@@ -259,5 +259,37 @@ def get_status():
         return jsonify(task_status)
 
 
+@app.route("/api/top250")
+def api_top250():
+    """获取 Top 250 完整列表（包含是否在 Emby 中）"""
+    type = request.args.get("type", "imdb", type=str)
+
+    if type == "douban":
+        movies = query("""
+            SELECT
+                m.ranking, m.title, m.douban_link, m.imdb_id,
+                CASE WHEN e.imdb_id IS NOT NULL OR e.title IS NOT NULL THEN 1 ELSE 0 END AS in_emby
+            FROM douban_top250 m
+            LEFT JOIN emby_movies e ON (
+                m.imdb_id = e.imdb_id
+                OR e.title LIKE CONCAT(m.title, '%%')
+                OR m.title LIKE CONCAT(e.title, '%%')
+            )
+            ORDER BY m.ranking
+        """)
+    else:
+        movies = query("""
+            SELECT
+                i.title, i.imdb_id,
+                e.imdb_rating AS rating,
+                CASE WHEN e.imdb_id IS NOT NULL THEN 1 ELSE 0 END AS in_emby
+            FROM imdb_top250 i
+            LEFT JOIN emby_movies e ON i.imdb_id = e.imdb_id
+            ORDER BY e.imdb_rating DESC
+        """)
+
+    return jsonify({"movies": movies})
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=False)

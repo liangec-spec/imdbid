@@ -67,6 +67,21 @@
   .filters label:hover { color: var(--text); }
   .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(0,0,0,.3); border-top-color: #000; border-radius: 50%; animation: spin .6s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
+  .clickable { cursor: pointer; transition: all .2s; }
+  .clickable:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,.3); }
+  /* 模态框 */
+  .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,.7); z-index: 1000; justify-content: center; align-items: center; }
+  .modal-overlay.active { display: flex; }
+  .modal { background: var(--card); border-radius: 16px; width: 90%; max-width: 900px; max-height: 85vh; display: flex; flex-direction: column; }
+  .modal-header { padding: 20px 24px; border-bottom: 1px solid rgba(255,255,255,.1); display: flex; justify-content: space-between; align-items: center; }
+  .modal-header h2 { font-size: 20px; }
+  .modal-close { background: none; border: none; color: var(--dim); font-size: 24px; cursor: pointer; padding: 4px 8px; }
+  .modal-close:hover { color: var(--text); }
+  .modal-body { padding: 16px 24px; overflow-y: auto; flex: 1; }
+  .modal-body table { margin: 0; }
+  .modal-body td, .modal-body th { padding: 8px 12px; }
+  .missing-badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 4px; background: rgba(248,113,113,.2); color: var(--red); font-weight: 600; }
+  .owned-badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 4px; background: rgba(74,222,128,.2); color: var(--green); font-weight: 600; }
   /* 分页样式 */
   .pagination { display: flex; justify-content: center; align-items: center; gap: 8px; margin: 20px 0; }
   .pagination button { background: var(--card); color: var(--text); border: 1px solid rgba(255,255,255,.1); padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px; transition: all .2s; }
@@ -108,11 +123,11 @@
 <div class="status-bar" id="statusBar"></div>
 
 <div class="stats">
-  <div class="stat">
+  <div class="stat clickable" onclick="showTop250Modal('douban')">
     <div class="num" id="doubanMissing">{{ douban_missing_count }}<span style="font-size:18px;color:var(--dim)"> / {{ douban_total }}</span></div>
     <div class="label">豆瓣 Top250 缺失</div>
   </div>
-  <div class="stat">
+  <div class="stat clickable" onclick="showTop250Modal('imdb')">
     <div class="num" id="imdbMissing">{{ imdb_missing_count }}<span style="font-size:18px;color:var(--dim)"> / {{ imdb_total }}</span></div>
     <div class="label">IMDB Top250 缺失</div>
   </div>
@@ -128,22 +143,21 @@
   <div class="tab active" onclick="switchTab(2)">🎬 Emby 清单</div>
 </div>
 
-<!-- 豆瓣缺失 -->
-<div class="panel" id="panel-0">
-  <div class="loading" id="doubanLoading">加载中...</div>
-  <table id="doubanTable" style="display:none">
-    <thead><tr><th>#</th><th>排名</th><th>电影名称</th><th>IMDB ID</th></tr></thead>
-    <tbody></tbody>
-  </table>
-</div>
-
-<!-- IMDB 缺失 -->
-<div class="panel" id="panel-1">
-  <div class="loading" id="imdbLoading">加载中...</div>
-  <table id="imdbTable" style="display:none">
-    <thead><tr><th>#</th><th>电影名称</th><th>IMDB ID</th></tr></thead>
-    <tbody></tbody>
-  </table>
+<!-- Top 250 模态框 -->
+<div class="modal-overlay" id="top250Modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modalTitle">Top 250</h2>
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div id="modalLoading" class="loading">加载中...</div>
+      <table id="modalTable" style="display:none">
+        <thead id="modalThead"></thead>
+        <tbody id="modalTbody"></tbody>
+      </table>
+    </div>
+  </div>
 </div>
 
 <!-- Emby 电影清单 -->
@@ -192,10 +206,6 @@ let searchTimer = null;
 function switchTab(i) {
   document.querySelectorAll('.tab').forEach((t,j) => t.classList.toggle('active', j===i));
   document.querySelectorAll('.panel').forEach((p,j) => p.classList.toggle('active', j===i));
-
-  // 懒加载缺失列表
-  if (i === 0) loadMissing('douban');
-  if (i === 1) loadMissing('imdb');
 }
 
 // 防抖搜索
@@ -310,43 +320,68 @@ function renderPagination(page, totalPages, total) {
   container.innerHTML = html;
 }
 
-// 加载缺失列表
-function loadMissing(type) {
-  const loadingId = type === 'douban' ? 'doubanLoading' : 'imdbLoading';
-  const tableId = type === 'douban' ? 'doubanTable' : 'imdbTable';
+// 显示 Top 250 模态框
+function showTop250Modal(type) {
+  const modal = document.getElementById('top250Modal');
+  modal.classList.add('active');
 
-  fetch(`/api/movies/missing?type=${type}`)
+  const title = type === 'douban' ? '📗 豆瓣 Top 250' : '📙 IMDB Top 250';
+  document.getElementById('modalTitle').textContent = title;
+
+  document.getElementById('modalLoading').style.display = '';
+  document.getElementById('modalTable').style.display = 'none';
+
+  // 设置表头
+  const thead = document.getElementById('modalThead');
+  if (type === 'douban') {
+    thead.innerHTML = '<tr><th>#</th><th>排名</th><th>电影名称</th><th>IMDB ID</th><th>状态</th></tr>';
+  } else {
+    thead.innerHTML = '<tr><th>#</th><th>电影名称</th><th>IMDB ID</th><th>评分</th><th>状态</th></tr>';
+  }
+
+  fetch(`/api/top250?type=${type}`)
     .then(r => r.json())
     .then(data => {
-      document.getElementById(loadingId).style.display = 'none';
-      const table = document.getElementById(tableId);
-      table.style.display = '';
+      document.getElementById('modalLoading').style.display = 'none';
+      document.getElementById('modalTable').style.display = '';
 
-      const tbody = table.querySelector('tbody');
-      if (type === 'douban') {
-        tbody.innerHTML = data.movies.map((m, i) => `
-          <tr>
+      const tbody = document.getElementById('modalTbody');
+      tbody.innerHTML = data.movies.map((m, i) => {
+        const status = m.in_emby
+          ? '<span class="owned-badge">✓ 已收录</span>'
+          : '<span class="missing-badge">✗ 未收录</span>';
+
+        if (type === 'douban') {
+          return `<tr style="${m.in_emby ? '' : 'opacity:0.6'}">
             <td>${i + 1}</td>
             <td>${m.ranking}</td>
             <td><a href="${m.douban_link}" target="_blank">${m.title}</a></td>
             <td>${m.imdb_id ? `<a href="https://www.imdb.com/title/${m.imdb_id}/" target="_blank">${m.imdb_id}</a>` : '-'}</td>
-          </tr>
-        `).join('');
-      } else {
-        tbody.innerHTML = data.movies.map((m, i) => `
-          <tr>
+            <td>${status}</td>
+          </tr>`;
+        } else {
+          return `<tr style="${m.in_emby ? '' : 'opacity:0.6'}">
             <td>${i + 1}</td>
             <td>${m.title}</td>
             <td><a href="https://www.imdb.com/title/${m.imdb_id}/" target="_blank">${m.imdb_id}</a></td>
-          </tr>
-        `).join('');
-      }
-
-      if (data.movies.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--green)">🎉 你的 Emby 库已拥有${type === 'douban' ? '豆瓣' : 'IMDB'} Top 250 全部电影！</td></tr>`;
-      }
+            <td>${m.rating ? `⭐ ${m.rating}` : '-'}</td>
+            <td>${status}</td>
+          </tr>`;
+        }
+      }).join('');
     });
 }
+
+function closeModal() {
+  document.getElementById('top250Modal').classList.remove('active');
+}
+
+// 点击遮罩层关闭
+document.addEventListener('click', function(e) {
+  if (e.target.classList.contains('modal-overlay')) {
+    closeModal();
+  }
+});
 
 // ========== 更新功能 ==========
 const LABELS = {'emby': 'Emby清单', 'imdb': 'IMDB 250', 'douban': '豆瓣250'};
