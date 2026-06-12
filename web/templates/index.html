@@ -6,11 +6,21 @@
 <title>Emby 电影管理</title>
 <style>
   :root { --bg: #0f172a; --card: #1e293b; --accent: #38bdf8; --text: #e2e8f0; --dim: #94a3b8; --green: #4ade80; --red: #f87171; --yellow: #fbbf24; }
+  /* 配色方案 */
+  [data-theme="midnight"] { --bg: #0f172a; --card: #1e293b; --accent: #38bdf8; --text: #e2e8f0; --dim: #94a3b8; --green: #4ade80; --red: #f87171; --yellow: #fbbf24; }
+  [data-theme="emerald"] { --bg: #0a1f1a; --card: #14332a; --accent: #34d399; --text: #e2e8f0; --dim: #86978e; --green: #6ee7b7; --red: #fca5a5; --yellow: #fcd34d; }
+  [data-theme="sunset"] { --bg: #1c1117; --card: #2d1f2b; --accent: #f472b6; --text: #fce7f3; --dim: #a8899a; --green: #86efac; --red: #fca5a5; --yellow: #fde68a; }
+  [data-theme="ocean"] { --bg: #0c1524; --card: #162236; --accent: #60a5fa; --text: #dbeafe; --dim: #7a96b8; --green: #4ade80; --red: #fb7185; --yellow: #facc15; }
+  [data-theme="purple"] { --bg: #1a1025; --card: #2a1d3a; --accent: #a78bfa; --text: #ede9fe; --dim: #8b7fa8; --green: #86efac; --red: #fca5a5; --yellow: #fde68a; }
+  [data-theme="light"] { --bg: #f8fafc; --card: #ffffff; --accent: #3b82f6; --text: #1e293b; --dim: #64748b; --green: #22c55e; --red: #ef4444; --yellow: #eab308; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
   .header { text-align: center; padding: 40px 20px 20px; }
   .header h1 { font-size: 28px; font-weight: 700; }
   .header p { color: var(--dim); margin-top: 8px; }
+  .theme-switcher { margin-top: 12px; }
+  .theme-switcher select { background: var(--card); color: var(--text); border: 1px solid rgba(255,255,255,.1); padding: 6px 12px; border-radius: 6px; font-size: 14px; cursor: pointer; outline: none; }
+  .theme-switcher select:focus { border-color: var(--accent); }
   .stats { display: flex; justify-content: center; gap: 24px; margin: 24px auto; flex-wrap: wrap; }
   .stat { background: var(--card); border-radius: 12px; padding: 20px 32px; text-align: center; min-width: 200px; }
   .stat .num { font-size: 36px; font-weight: 700; color: var(--accent); }
@@ -77,6 +87,16 @@
 <div class="header">
   <h1>🎬 Emby 电影管理</h1>
   <p>对比豆瓣 / IMDB Top 250，查看 Emby 库电影清单</p>
+  <div class="theme-switcher">
+    <select id="themeSelect" onchange="switchTheme(this.value)">
+      <option value="midnight">🌙 午夜蓝</option>
+      <option value="emerald">💚 翡翠绿</option>
+      <option value="sunset">🌅 日落粉</option>
+      <option value="ocean">🌊 海洋蓝</option>
+      <option value="purple">💜 星空紫</option>
+      <option value="light">☀️ 浅色模式</option>
+    </select>
+  </div>
 </div>
 
 <!-- 更新按钮 -->
@@ -383,8 +403,19 @@ function showStatus(type, msg) {
   bar.innerHTML = `<span class="status-msg status-${type}">${msg}</span>`;
 }
 
+// 主题切换
+function switchTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('theme', theme);
+}
+
 // 页面加载
 window.addEventListener('DOMContentLoaded', function() {
+  // 加载保存的主题
+  const savedTheme = localStorage.getItem('theme') || 'midnight';
+  document.documentElement.setAttribute('data-theme', savedTheme);
+  document.getElementById('themeSelect').value = savedTheme;
+
   // 默认按 IMDB 评分降序
   document.querySelector('th[data-col="imdb_rating"]').classList.add('sorted-desc');
   loadMovies(1);
