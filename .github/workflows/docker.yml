@@ -39,7 +39,8 @@ jobs:
             echo "IS_RELEASE=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Build and push
+      - name: Build and push (release)
+        if: startsWith(github.ref, 'refs/tags/')
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -47,6 +48,17 @@ jobs:
           push: true
           tags: |
             ${{ secrets.DOCKER_USERNAME }}/emby-movies:${{ steps.tag.outputs.TAG }}
-            ${{ steps.outputs.IS_RELEASE == 'true' && format('{0}/emby-movies:latest', secrets.DOCKER_USERNAME) || '' }}
+            ${{ secrets.DOCKER_USERNAME }}/emby-movies:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push (feature)
+        if: startsWith(github.ref, 'refs/heads/')
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/emby-movies:${{ steps.tag.outputs.TAG }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
