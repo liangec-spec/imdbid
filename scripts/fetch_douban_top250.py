@@ -32,7 +32,7 @@ client.headers.update(HEADERS)
 
 def fetch_top250_list():
     """爬取豆瓣 Top 250 列表"""
-    movies = [None] * 250
+    movies = []
 
     for start in range(0, 250, 25):
         url = f"{BASE_URL}?start={start}&filter="
@@ -63,17 +63,28 @@ def fetch_top250_list():
         for rank_str, link, name in items:
             rank = int(rank_str)
             if 1 <= rank <= 250:
-                movies[rank - 1] = {"name": name, "link": link, "imdb_id": ""}
+                douban_id = extract_douban_id(link)
+                movies.append({
+                    "rank": rank,
+                    "name": name,
+                    "link": link,
+                    "douban_id": douban_id,
+                    "imdb_id": "",
+                })
 
         time.sleep(1)  # 避免请求过快
 
-    return [m for m in movies if m is not None]
+    return sorted(movies, key=lambda x: x["rank"])
 
 
 def extract_douban_id(link):
     """从豆瓣链接提取 subject ID"""
     match = re.search(r"/subject/(\d+)", link)
     return match.group(1) if match else ""
+
+def extract_douban_id_from_link(link):
+    """从豆瓣链接提取 subject ID（别名）"""
+    return extract_douban_id(link)
 
 
 def get_douban_info(douban_id):
@@ -171,9 +182,9 @@ def save_to_csv(movies, filename):
     os.makedirs(os.path.dirname(filename) or ".", exist_ok=True)
     with open(filename, "w", newline="", encoding="utf-8-sig") as f:
         writer = csv.writer(f)
-        writer.writerow(["排名", "电影名称", "豆瓣链接", "IMDB ID"])
-        for i, movie in enumerate(movies, 1):
-            writer.writerow([i, movie["name"], movie["link"], movie["imdb_id"]])
+        writer.writerow(["排名", "电影名称", "豆瓣ID", "豆瓣链接", "IMDB ID"])
+        for movie in movies:
+            writer.writerow([movie["rank"], movie["name"], movie["douban_id"], movie["link"], movie["imdb_id"]])
     print(f"\n✅ 已导出到 {filename}")
 
 
@@ -185,10 +196,10 @@ def save_to_mysql(movies):
             cur.execute("DELETE FROM douban_top250")
             deleted = cur.rowcount
 
-            sql = "INSERT INTO douban_top250 (ranking, title, douban_link, imdb_id) VALUES (%s, %s, %s, %s)"
-            for i, movie in enumerate(movies, 1):
+            sql = "INSERT INTO douban_top250 (ranking, title, douban_id, douban_link, imdb_id) VALUES (%s, %s, %s, %s, %s)"
+            for movie in movies:
                 imdb_id = movie["imdb_id"] if movie["imdb_id"] else None
-                cur.execute(sql, (i, movie["name"], movie["link"], imdb_id))
+                cur.execute(sql, (movie["rank"], movie["name"], movie["douban_id"], movie["link"], imdb_id))
 
             conn.commit()
             print(f"MySQL: 删除旧记录 {deleted} 条，插入新记录 {len(movies)} 条")

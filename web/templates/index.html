@@ -408,15 +408,15 @@ function renderDoubanTop250(movies) {
     if (m.imdb_id) {
       imdbCell = `<a href="https://www.imdb.com/title/${m.imdb_id}/" target="_blank">${m.imdb_id}</a>${sourceHtml}`;
     } else {
-      imdbCell = `<span style="color:var(--dim)">-</span>`;
+      imdbCell = '<span style="color:var(--dim)">-</span>';
     }
 
     // 操作按钮
     let actionCell = '';
     if (m.imdb_id && m.imdb_source === 'manual') {
-      actionCell = `<button class="edit-btn delete" onclick="deleteMapping(${m.ranking})" title="删除关联">🗑️</button>`;
+      actionCell = `<button class="edit-btn delete" onclick="deleteMapping('${m.douban_id}')" title="删除关联">🗑️</button>`;
     } else {
-      actionCell = `<button class="edit-btn" onclick="showEditInput(this, ${m.ranking}, '${m.title.replace(/'/g, "\\'")}')" title="关联 IMDB ID">✏️</button>`;
+      actionCell = `<button class="edit-btn" onclick="showEditInput(this, '${m.douban_id}', '${m.title.replace(/'/g, "\\'")}')" title="关联 IMDB ID">✏️</button>`;
     }
 
     return `<tr class="${rowClass}" data-title="${m.title.toLowerCase()}" data-owned="${m.in_emby}" data-imdb-source="${m.imdb_source || 'none'}">
@@ -493,10 +493,8 @@ function updateTop250Count(type, movies) {
 
 // ========== 映射管理功能 ==========
 
-function showEditInput(btn, ranking, title) {
-  // 移除其他输入框
+function showEditInput(btn, doubanId, title) {
   document.querySelectorAll('.edit-input-row').forEach(el => el.remove());
-
   const tr = btn.closest('tr');
   const newRow = document.createElement('tr');
   newRow.className = 'edit-input-row';
@@ -506,7 +504,7 @@ function showEditInput(btn, ranking, title) {
         <span style="color: var(--dim);">为 <strong>${title}</strong> 关联 IMDB ID:</span>
         <input type="text" class="edit-input" id="editImdbId" placeholder="tt1234567" style="width: 120px;">
         <input type="text" class="edit-input" id="editNote" placeholder="备注（可选）" style="width: 150px;">
-        <button class="edit-btn" onclick="saveMapping(${ranking}, '${title.replace(/'/g, "\\'")}')">保存</button>
+        <button class="edit-btn" onclick="saveMapping('${doubanId}', '${title.replace(/'/g, "\\'")}')">保存</button>
         <button class="edit-btn" style="background:var(--dim)" onclick="this.closest('.edit-input-row').remove()">取消</button>
       </div>
     </td>
@@ -515,18 +513,11 @@ function showEditInput(btn, ranking, title) {
   document.getElementById('editImdbId').focus();
 }
 
-function saveMapping(ranking, title) {
+function saveMapping(doubanId, title) {
   const imdbId = document.getElementById('editImdbId').value.trim();
   const note = document.getElementById('editNote').value.trim();
-
-  if (!imdbId) {
-    alert('请输入 IMDB ID');
-    return;
-  }
-
-  if (!imdbId.startsWith('tt')) {
-    alert('IMDB ID 格式错误，应以 tt 开头');
-    return;
+  if (!imdbId) { alert('请输入 IMDB ID'); return; }
+  if (!imdbId.startsWith('tt')) { alert('IMDB ID 格式错误，应以 tt 开头'); return;
   }
 
   fetch('/api/mapping', {
@@ -537,7 +528,6 @@ function saveMapping(ranking, title) {
     .then(r => r.json())
     .then(data => {
       if (data.status === 'ok') {
-        // 重新加载数据
         loadTop250('douban');
       } else {
         alert(data.message || '保存失败');
@@ -546,10 +536,9 @@ function saveMapping(ranking, title) {
     .catch(err => alert('请求失败: ' + err));
 }
 
-function deleteMapping(ranking) {
+function deleteMapping(doubanId) {
   if (!confirm('确定删除此关联？')) return;
-
-  fetch(`/api/mapping/${ranking}`, { method: 'DELETE' })
+  fetch(`/api/mapping/${doubanId}`, { method: 'DELETE' })
     .then(r => r.json())
     .then(data => {
       if (data.status === 'ok') {
