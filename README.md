@@ -133,7 +133,8 @@ python web/app.py
 | ---- | ---- |
 | emby_movies | Emby 电影数据（含 IMDB 评分） |
 | imdb_top250 | IMDB Top 250 |
-| douban_top250 | 豆瓣 Top 250 |
+| douban_top250 | 豆瓣 Top 250（含 douban_id） |
+| douban_imdb_mapping | 豆瓣-IMDB 手动关联映射 |
 
 ## 🔄 版本发布
 
@@ -146,8 +147,8 @@ git commit -m "feat: 添加新功能"
 git push
 
 # 2. 创建版本 tag
-git tag -a v1.3.0 -m "版本 1.3.0"
-git push origin v1.3.0
+git tag -a v2.1.0 -m "版本 2.1.0"
+git push origin v2.1.0
 
 # 3. GitHub Actions 自动构建并推送到 Docker Hub
 ```
@@ -170,9 +171,27 @@ git push origin v1.3.0
 | 标签 | 说明 |
 | ---- | ---- |
 | `liangec/emby-movies:latest` | 最新稳定版 |
-| `liangec/emby-movies:v1.2.0` | 特定版本 |
+| `liangec/emby-movies:v2.0.0` | 特定版本 |
 
 ## 📝 版本历史
+
+### v2.0.0 (2026-06-15)
+
+#### 重大重构
+
+- 豆瓣 Top 250 使用 douban_id 作为主键
+- 手动关联功能（文件+数据库双备份）
+- 后端分页和搜索 API
+- 主题切换功能（6种配色）
+- 分辨率从 path 字段提取（更准确）
+- 新增位置列显示（movie1/movie2）
+- Top 250 页面内展示（支持搜索和筛选）
+- 最低投票数提高到 100,000
+
+#### 数据库变更
+
+- douban_top250 表添加 douban_id 字段
+- 新增 douban_imdb_mapping 表
 
 ### v1.2.0 (2026-06-11)
 
@@ -201,3 +220,7 @@ git push origin v1.3.0
 ## 📄 许可证
 
 MIT License
+
+## 🗒️ 开发计划
+
+- [ ] 电影合集展示（parentId=43626，方案1：合集列表页）

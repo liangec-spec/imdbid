@@ -103,17 +103,18 @@ def sync_mapping_to_db():
     mappings = data.get("mappings", {})
     execute("DELETE FROM douban_imdb_mapping")
     if mappings:
-        sql = "INSERT INTO douban_imdb_mapping (douban_id, douban_title, imdb_id, note) VALUES (%s, %s, %s, %s)"
         conn = pymysql.connect(**DB_CONFIG)
         try:
             with conn.cursor() as cur:
                 for douban_id, info in mappings.items():
-                    cur.execute(sql, (
-                        douban_id,
-                        info.get("title", ""),
-                        info.get("imdb_id", ""),
-                        info.get("note", ""),
-                    ))
+                    # 先查找 ranking
+                    cur.execute("SELECT ranking FROM douban_top250 WHERE douban_id = %s", (douban_id,))
+                    row = cur.fetchone()
+                    ranking = row[0] if row else 0
+                    cur.execute(
+                        "INSERT INTO douban_imdb_mapping (douban_id, douban_ranking, douban_title, imdb_id, note) VALUES (%s, %s, %s, %s, %s)",
+                        (douban_id, ranking, info.get("title", ""), info.get("imdb_id", ""), info.get("note", ""))
+                    )
             conn.commit()
         finally:
             conn.close()
@@ -200,11 +201,13 @@ def api_movies():
             e.title, e.original_title, e.year, e.imdb_id, e.rating,
             e.imdb_rating, e.imdb_votes, e.genres, e.directors, e.video_resolution,
             CASE
-                WHEN CAST(SUBSTRING_INDEX(e.video_resolution, 'x', 1) AS UNSIGNED) >= 3000 THEN '4K'
-                WHEN CAST(SUBSTRING_INDEX(e.video_resolution, 'x', 1) AS UNSIGNED) >= 1000 THEN '1080p'
-                WHEN CAST(SUBSTRING_INDEX(e.video_resolution, 'x', 1) AS UNSIGNED) >= 700 THEN '720p'
+                WHEN e.path LIKE '%%2160p%%' THEN '4K'
+                WHEN e.path LIKE '%%1080p%%' THEN '1080p'
+                WHEN e.path LIKE '%%720p%%' THEN '720p'
+                WHEN e.path LIKE '%%480p%%' THEN '480p'
                 ELSE IFNULL(e.video_resolution, '-')
             END AS resolution_label,
+            SUBSTRING_INDEX(SUBSTRING_INDEX(e.path, '\\\\', 4), '\\\\', -1) AS location,
             CASE WHEN i.imdb_id IS NOT NULL THEN 1 ELSE 0 END AS in_imdb250,
             CASE WHEN EXISTS (
                 SELECT 1 FROM douban_top250 d
@@ -284,21 +287,21 @@ def api_top250():
     else:
         rows = query("""
             SELECT
+                ROW_NUMBER() OVER (ORDER BY i.id) AS `rank`,
                 i.title, i.imdb_id, e.year,
                 e.imdb_rating AS rating,
                 e.imdb_votes AS votes,
-                e.video_resolution,
                 CASE
-                    WHEN e.video_resolution IS NULL THEN NULL
-                    WHEN CAST(SUBSTRING_INDEX(e.video_resolution, 'x', 1) AS UNSIGNED) >= 3000 THEN '4K'
-                    WHEN CAST(SUBSTRING_INDEX(e.video_resolution, 'x', 1) AS UNSIGNED) >= 1000 THEN '1080p'
-                    WHEN CAST(SUBSTRING_INDEX(e.video_resolution, 'x', 1) AS UNSIGNED) >= 700 THEN '720p'
-                    ELSE e.video_resolution
+                    WHEN e.path LIKE '%%2160p%%' THEN '4K'
+                    WHEN e.path LIKE '%%1080p%%' THEN '1080p'
+                    WHEN e.path LIKE '%%720p%%' THEN '720p'
+                    WHEN e.path LIKE '%%480p%%' THEN '480p'
+                    ELSE NULL
                 END AS resolution,
                 CASE WHEN e.imdb_id IS NOT NULL THEN 1 ELSE 0 END AS in_emby
             FROM imdb_top250 i
             LEFT JOIN emby_movies e ON i.imdb_id = e.imdb_id
-            ORDER BY e.imdb_rating DESC
+            ORDER BY i.id
         """)
         movies = []
         for r in rows:
@@ -336,11 +339,15 @@ def api_mapping_save():
     }
     save_mapping(data)
 
+    # 查找 ranking
+    row = query("SELECT ranking FROM douban_top250 WHERE douban_id = %s", (douban_id,))
+    ranking = row[0]["ranking"] if row else 0
+
     execute("""
-        INSERT INTO douban_imdb_mapping (douban_id, douban_title, imdb_id, note)
-        VALUES (%s, %s, %s, %s)
+        INSERT INTO douban_imdb_mapping (douban_id, douban_ranking, douban_title, imdb_id, note)
+        VALUES (%s, %s, %s, %s, %s)
         ON DUPLICATE KEY UPDATE imdb_id = VALUES(imdb_id), note = VALUES(note)
-    """, (douban_id, title, imdb_id, note))
+    """, (douban_id, ranking, title, imdb_id, note))
 
     return jsonify({"status": "ok", "message": "保存成功"})
 

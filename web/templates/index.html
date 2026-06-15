@@ -189,6 +189,7 @@
     <thead>
       <tr>
         <th>#</th>
+        <th>排名</th>
         <th>电影名称</th>
         <th>年份</th>
         <th>IMDB 评分</th>
@@ -226,6 +227,7 @@
         <th class="sortable" data-col="imdb_rating" onclick="changeSort('imdb_rating')">IMDB评分 <span class="arrow up">▲</span><span class="arrow down">▼</span></th>
         <th>IMDB ID</th>
         <th>分辨率</th>
+        <th>位置</th>
         <th>IMDB 250</th>
         <th>豆瓣 250</th>
         <th>导演</th>
@@ -324,6 +326,7 @@ function renderMovies(movies) {
       <td>${m.imdb_rating ? `<span style="color:var(--yellow)">⭐ ${parseFloat(m.imdb_rating).toFixed(1)}</span>${m.imdb_votes ? `<br><span style="font-size:11px;color:var(--dim)">${m.imdb_votes.toLocaleString()}票</span>` : ''}` : '-'}</td>
       <td>${m.imdb_id ? `<a href="https://www.imdb.com/title/${m.imdb_id}/" target="_blank">${m.imdb_id}</a>` : '-'}</td>
       <td>${formatResolution(m.resolution_label)}</td>
+      <td>${m.location || '-'}</td>
       <td>${m.in_imdb250 ? '<span class="badge badge-yes">✓ IMDB</span>' : '<span class="badge badge-no">-</span>'}</td>
       <td>${m.in_douban250 ? '<span class="badge badge-yes">✓ 豆瓣</span>' : '<span class="badge badge-no">-</span>'}</td>
       <td style="color:var(--dim);font-size:13px">${m.directors || '-'}</td>
@@ -443,11 +446,12 @@ function renderImdbTop250(movies) {
       : '<span class="status-badge status-missing">✗ 未收录</span>';
 
     return `<tr class="${rowClass}" data-title="${m.title.toLowerCase()}" data-owned="${m.in_emby}">
-      <td>${i + 1}</td>
+      <td>${m.rank || i + 1}</td>
+      <td>${m.rank || i + 1}</td>
       <td><a href="https://www.imdb.com/title/${m.imdb_id}/" target="_blank">${m.title}</a></td>
       <td>${m.year || '-'}</td>
       <td>${m.rating ? `⭐ ${m.rating}` : '-'}</td>
-      <td>${m.imdb_votes ? m.imdb_votes.toLocaleString() : '-'}</td>
+      <td>${m.votes ? m.votes.toLocaleString() : '-'}</td>
       <td><a href="https://www.imdb.com/title/${m.imdb_id}/" target="_blank">${m.imdb_id}</a></td>
       <td>${m.resolution ? formatResolution(m.resolution) : '-'}</td>
       <td>${status}</td>
@@ -517,13 +521,12 @@ function saveMapping(doubanId, title) {
   const imdbId = document.getElementById('editImdbId').value.trim();
   const note = document.getElementById('editNote').value.trim();
   if (!imdbId) { alert('请输入 IMDB ID'); return; }
-  if (!imdbId.startsWith('tt')) { alert('IMDB ID 格式错误，应以 tt 开头'); return;
-  }
+  if (!imdbId.startsWith('tt')) { alert('IMDB ID 格式错误，应以 tt 开头'); return; }
 
   fetch('/api/mapping', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ranking, title, imdb_id: imdbId, note })
+    body: JSON.stringify({ douban_id: doubanId, title, imdb_id: imdbId, note })
   })
     .then(r => r.json())
     .then(data => {
