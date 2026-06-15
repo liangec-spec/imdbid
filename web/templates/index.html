@@ -83,6 +83,15 @@
   .status-badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 600; }
   .status-owned { background: rgba(74,222,128,.2); color: var(--green); }
   .status-missing { background: rgba(248,113,113,.2); color: var(--red); }
+  .status-manual { background: rgba(251,191,36,.2); color: var(--yellow); }
+  .source-badge { display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 3px; margin-left: 4px; }
+  .source-auto { background: rgba(56,189,248,.15); color: var(--accent); }
+  .source-manual { background: rgba(251,191,36,.15); color: var(--yellow); }
+  /* 编辑输入框 */
+  .edit-input { background: var(--bg); border: 1px solid var(--accent); color: var(--text); padding: 4px 8px; border-radius: 4px; font-size: 12px; width: 100px; }
+  .edit-btn { background: var(--accent); color: #000; border: none; padding: 4px 8px; border-radius: 4px; font-size: 12px; cursor: pointer; margin-left: 4px; }
+  .edit-btn:hover { opacity: 0.8; }
+  .edit-btn.delete { background: var(--red); }
   @media (max-width: 768px) {
     .stats { flex-direction: column; align-items: center; }
     td, th { padding: 8px 10px; font-size: 13px; }
@@ -144,6 +153,7 @@
       <label><input type="radio" name="doubanFilter" value="all" onchange="filterTop250('douban')" checked> 全部</label>
       <label><input type="radio" name="doubanFilter" value="owned" onchange="filterTop250('douban')"> 已收录</label>
       <label><input type="radio" name="doubanFilter" value="missing" onchange="filterTop250('douban')"> 未收录</label>
+      <label><input type="radio" name="doubanFilter" value="noimdb" onchange="filterTop250('douban')"> 无 IMDB ID</label>
     </div>
   </div>
   <div class="count" id="doubanCount">加载中...</div>
@@ -156,7 +166,7 @@
         <th>年份</th>
         <th>IMDB 评分</th>
         <th>IMDB ID</th>
-        <th>豆瓣链接</th>
+        <th>操作</th>
         <th>状态</th>
       </tr>
     </thead>
@@ -385,14 +395,38 @@ function renderDoubanTop250(movies) {
       ? '<span class="status-badge status-owned">✓ 已收录</span>'
       : '<span class="status-badge status-missing">✗ 未收录</span>';
 
-    return `<tr class="${rowClass}" data-title="${m.title.toLowerCase()}" data-owned="${m.in_emby}">
+    // 来源标识
+    let sourceHtml = '';
+    if (m.imdb_source === 'manual') {
+      sourceHtml = '<span class="source-badge source-manual">手动</span>';
+    } else if (m.imdb_source === 'auto') {
+      sourceHtml = '<span class="source-badge source-auto">自动</span>';
+    }
+
+    // IMDB ID 显示/编辑
+    let imdbCell = '';
+    if (m.imdb_id) {
+      imdbCell = `<a href="https://www.imdb.com/title/${m.imdb_id}/" target="_blank">${m.imdb_id}</a>${sourceHtml}`;
+    } else {
+      imdbCell = `<span style="color:var(--dim)">-</span>`;
+    }
+
+    // 操作按钮
+    let actionCell = '';
+    if (m.imdb_id && m.imdb_source === 'manual') {
+      actionCell = `<button class="edit-btn delete" onclick="deleteMapping(${m.ranking})" title="删除关联">🗑️</button>`;
+    } else {
+      actionCell = `<button class="edit-btn" onclick="showEditInput(this, ${m.ranking}, '${m.title.replace(/'/g, "\\'")}')" title="关联 IMDB ID">✏️</button>`;
+    }
+
+    return `<tr class="${rowClass}" data-title="${m.title.toLowerCase()}" data-owned="${m.in_emby}" data-imdb-source="${m.imdb_source || 'none'}">
       <td>${i + 1}</td>
       <td>${m.ranking}</td>
       <td><a href="${m.douban_link}" target="_blank">${m.title}</a></td>
       <td>${m.year || '-'}</td>
       <td>${m.imdb_rating ? `⭐ ${m.imdb_rating}` : '-'}</td>
-      <td>${m.imdb_id ? `<a href="https://www.imdb.com/title/${m.imdb_id}/" target="_blank">${m.imdb_id}</a>` : '-'}</td>
-      <td><a href="${m.douban_link}" target="_blank">🔗</a></td>
+      <td>${imdbCell}</td>
+      <td>${actionCell}</td>
       <td>${status}</td>
     </tr>`;
   }).join('');
@@ -430,7 +464,10 @@ function filterTop250(type) {
 
   const filtered = movies.filter(m => {
     const matchSearch = m.title.toLowerCase().includes(search) || (m.imdb_id && m.imdb_id.toLowerCase().includes(search));
-    const matchFilter = filter === 'all' || (filter === 'owned' && m.in_emby) || (filter === 'missing' && !m.in_emby);
+    let matchFilter = true;
+    if (filter === 'owned') matchFilter = m.in_emby;
+    else if (filter === 'missing') matchFilter = !m.in_emby;
+    else if (filter === 'noimdb') matchFilter = !m.imdb_id || m.imdb_source === 'none';
     return matchSearch && matchFilter;
   });
 
@@ -445,8 +482,83 @@ function updateTop250Count(type, movies) {
   const total = movies.length;
   const owned = movies.filter(m => m.in_emby).length;
   const missing = total - owned;
+  const noimdb = movies.filter(m => !m.imdb_id || m.imdb_source === 'none').length;
   const countEl = document.getElementById(type === 'douban' ? 'doubanCount' : 'imdbCount');
-  countEl.textContent = `共 ${total} 部电影 | 已收录 ${owned} | 未收录 ${missing}`;
+  if (type === 'douban') {
+    countEl.textContent = `共 ${total} 部电影 | 已收录 ${owned} | 未收录 ${missing} | 无 IMDB ID ${noimdb}`;
+  } else {
+    countEl.textContent = `共 ${total} 部电影 | 已收录 ${owned} | 未收录 ${missing}`;
+  }
+}
+
+// ========== 映射管理功能 ==========
+
+function showEditInput(btn, ranking, title) {
+  // 移除其他输入框
+  document.querySelectorAll('.edit-input-row').forEach(el => el.remove());
+
+  const tr = btn.closest('tr');
+  const newRow = document.createElement('tr');
+  newRow.className = 'edit-input-row';
+  newRow.innerHTML = `
+    <td colspan="8" style="padding: 8px 16px; background: var(--card);">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="color: var(--dim);">为 <strong>${title}</strong> 关联 IMDB ID:</span>
+        <input type="text" class="edit-input" id="editImdbId" placeholder="tt1234567" style="width: 120px;">
+        <input type="text" class="edit-input" id="editNote" placeholder="备注（可选）" style="width: 150px;">
+        <button class="edit-btn" onclick="saveMapping(${ranking}, '${title.replace(/'/g, "\\'")}')">保存</button>
+        <button class="edit-btn" style="background:var(--dim)" onclick="this.closest('.edit-input-row').remove()">取消</button>
+      </div>
+    </td>
+  `;
+  tr.after(newRow);
+  document.getElementById('editImdbId').focus();
+}
+
+function saveMapping(ranking, title) {
+  const imdbId = document.getElementById('editImdbId').value.trim();
+  const note = document.getElementById('editNote').value.trim();
+
+  if (!imdbId) {
+    alert('请输入 IMDB ID');
+    return;
+  }
+
+  if (!imdbId.startsWith('tt')) {
+    alert('IMDB ID 格式错误，应以 tt 开头');
+    return;
+  }
+
+  fetch('/api/mapping', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ranking, title, imdb_id: imdbId, note })
+  })
+    .then(r => r.json())
+    .then(data => {
+      if (data.status === 'ok') {
+        // 重新加载数据
+        loadTop250('douban');
+      } else {
+        alert(data.message || '保存失败');
+      }
+    })
+    .catch(err => alert('请求失败: ' + err));
+}
+
+function deleteMapping(ranking) {
+  if (!confirm('确定删除此关联？')) return;
+
+  fetch(`/api/mapping/${ranking}`, { method: 'DELETE' })
+    .then(r => r.json())
+    .then(data => {
+      if (data.status === 'ok') {
+        loadTop250('douban');
+      } else {
+        alert(data.message || '删除失败');
+      }
+    })
+    .catch(err => alert('请求失败: ' + err));
 }
 
 // ========== 更新功能 ==========

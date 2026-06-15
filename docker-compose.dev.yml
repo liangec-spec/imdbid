@@ -1,0 +1,23 @@
+# 本地开发环境
+# 使用方法: docker compose -f docker-compose.dev.yml up -d
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: emby-movies-db-dev
+    environment:
+      MYSQL_ROOT_PASSWORD: dev123
+      MYSQL_DATABASE: douban_top250
+    ports:
+      - "3307:3306"  # 使用不同端口，避免冲突
+    volumes:
+      - mysql-dev-data:/var/lib/mysql
+      - ./sql/schema.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  mysql-dev-data:

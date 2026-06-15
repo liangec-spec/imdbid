@@ -2,10 +2,12 @@
 """
 Emby 电影管理 Web 界面
 """
+import json
 import os
 import sys
 import subprocess
 import threading
+from datetime import datetime
 
 from flask import Flask, render_template, jsonify, request
 import pymysql
@@ -13,7 +15,7 @@ import pymysql
 # 添加项目根目录到 path
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
-from config import DB_CONFIG
+from config import DB_CONFIG, DATA_DIR
 
 app = Flask(__name__)
 
@@ -23,6 +25,9 @@ SCRIPTS = {
     "imdb": os.path.join(PROJECT_ROOT, "scripts", "fetch_imdb_top250.py"),
     "douban": os.path.join(PROJECT_ROOT, "scripts", "fetch_douban_top250.py"),
 }
+
+# 映射文件路径
+MAPPING_FILE = os.path.join(DATA_DIR, "douban_mapping.json")
 
 # 任务状态（线程安全）
 task_status = {"emby": None, "imdb": None, "douban": None}
@@ -36,6 +41,18 @@ def query(sql, args=None):
         with conn.cursor(pymysql.cursors.DictCursor) as cur:
             cur.execute(sql, args)
             return cur.fetchall()
+    finally:
+        conn.close()
+
+
+def execute(sql, args=None):
+    """执行数据库写操作"""
+    conn = pymysql.connect(**DB_CONFIG)
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql, args)
+            conn.commit()
+            return cur.rowcount
     finally:
         conn.close()
 
@@ -59,6 +76,55 @@ def run_task(task_name, cmd, cwd=None):
             update_status(task_name, "error", result.stderr[-200:])
     except Exception as e:
         update_status(task_name, "error", str(e))
+
+
+# ========== 映射文件管理 ==========
+
+def load_mapping():
+    """从文件加载映射数据"""
+    if not os.path.exists(MAPPING_FILE):
+        return {"version": 1, "updated_at": None, "mappings": {}}
+    try:
+        with open(MAPPING_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {"version": 1, "updated_at": None, "mappings": {}}
+
+
+def save_mapping(data):
+    """保存映射数据到文件"""
+    os.makedirs(os.path.dirname(MAPPING_FILE), exist_ok=True)
+    data["updated_at"] = datetime.now().isoformat()
+    with open(MAPPING_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+def sync_mapping_to_db():
+    """从文件同步映射到数据库"""
+    data = load_mapping()
+    mappings = data.get("mappings", {})
+
+    # 清空表
+    execute("DELETE FROM douban_imdb_mapping")
+
+    # 批量插入
+    if mappings:
+        sql = "INSERT INTO douban_imdb_mapping (douban_ranking, douban_title, imdb_id, note) VALUES (%s, %s, %s, %s)"
+        conn = pymysql.connect(**DB_CONFIG)
+        try:
+            with conn.cursor() as cur:
+                for ranking, info in mappings.items():
+                    cur.execute(sql, (
+                        int(ranking),
+                        info.get("title", ""),
+                        info.get("imdb_id", ""),
+                        info.get("note", ""),
+                    ))
+            conn.commit()
+        finally:
+            conn.close()
+
+    return len(mappings)
 
 
 @app.route("/")
@@ -261,22 +327,36 @@ def get_status():
 
 @app.route("/api/top250")
 def api_top250():
-    """获取 Top 250 完整列表（包含是否在 Emby 中）"""
+    """获取 Top 250 完整列表（包含手动关联和是否在 Emby 中）"""
     type = request.args.get("type", "imdb", type=str)
 
     if type == "douban":
         movies = query("""
             SELECT
-                m.ranking, m.title, m.douban_link, m.imdb_id,
+                m.ranking, m.title, m.douban_link,
+                CASE
+                    WHEN map.imdb_id IS NOT NULL AND map.imdb_id != '' THEN map.imdb_id
+                    ELSE m.imdb_id
+                END AS imdb_id,
                 e.year, e.imdb_rating,
+                CASE
+                    WHEN map.imdb_id IS NOT NULL AND map.imdb_id != '' THEN 'manual'
+                    WHEN m.imdb_id IS NOT NULL AND m.imdb_id != '' THEN 'auto'
+                    ELSE 'none'
+                END AS imdb_source,
                 CASE WHEN EXISTS (
                     SELECT 1 FROM emby_movies e2
-                    WHERE m.imdb_id = e2.imdb_id
+                    WHERE (map.imdb_id IS NOT NULL AND map.imdb_id != '' AND map.imdb_id = e2.imdb_id)
+                       OR (m.imdb_id IS NOT NULL AND m.imdb_id != '' AND m.imdb_id = e2.imdb_id)
                        OR e2.title LIKE CONCAT(m.title, '%%')
                        OR m.title LIKE CONCAT(e2.title, '%%')
                 ) THEN 1 ELSE 0 END AS in_emby
             FROM douban_top250 m
-            LEFT JOIN emby_movies e ON m.imdb_id = e.imdb_id
+            LEFT JOIN douban_imdb_mapping map ON m.ranking = map.douban_ranking
+            LEFT JOIN emby_movies e ON (
+                (map.imdb_id IS NOT NULL AND map.imdb_id != '' AND map.imdb_id = e.imdb_id)
+                OR (m.imdb_id IS NOT NULL AND m.imdb_id != '' AND m.imdb_id = e.imdb_id)
+            )
             ORDER BY m.ranking
         """)
     else:
@@ -301,5 +381,81 @@ def api_top250():
     return jsonify({"movies": movies})
 
 
+# ========== 映射管理 API ==========
+
+@app.route("/api/mapping")
+def api_mapping_get():
+    """获取所有映射"""
+    data = load_mapping()
+    return jsonify(data)
+
+
+@app.route("/api/mapping", methods=["POST"])
+def api_mapping_save():
+    """保存映射（同时更新文件和数据库）"""
+    req = request.get_json()
+    ranking = req.get("ranking")
+    title = req.get("title", "")
+    imdb_id = req.get("imdb_id", "").strip()
+    note = req.get("note", "")
+
+    if not ranking or not imdb_id:
+        return jsonify({"status": "error", "message": "缺少必要参数"}), 400
+
+    # 验证 IMDB ID 格式
+    if not imdb_id.startswith("tt"):
+        return jsonify({"status": "error", "message": "IMDB ID 格式错误，应以 tt 开头"}), 400
+
+    # 更新文件
+    data = load_mapping()
+    data["mappings"][str(ranking)] = {
+        "title": title,
+        "imdb_id": imdb_id,
+        "note": note,
+        "updated_at": datetime.now().isoformat(),
+    }
+    save_mapping(data)
+
+    # 更新数据库
+    execute("""
+        INSERT INTO douban_imdb_mapping (douban_ranking, douban_title, imdb_id, note)
+        VALUES (%s, %s, %s, %s)
+        ON DUPLICATE KEY UPDATE imdb_id = VALUES(imdb_id), note = VALUES(note)
+    """, (ranking, title, imdb_id, note))
+
+    return jsonify({"status": "ok", "message": "保存成功"})
+
+
+@app.route("/api/mapping/<int:ranking>", methods=["DELETE"])
+def api_mapping_delete(ranking):
+    """删除映射"""
+    # 更新文件
+    data = load_mapping()
+    if str(ranking) in data["mappings"]:
+        del data["mappings"][str(ranking)]
+        save_mapping(data)
+
+    # 更新数据库
+    execute("DELETE FROM douban_imdb_mapping WHERE douban_ranking = %s", (ranking,))
+
+    return jsonify({"status": "ok", "message": "删除成功"})
+
+
+@app.route("/api/mapping/sync", methods=["POST"])
+def api_mapping_sync():
+    """从文件同步到数据库"""
+    count = sync_mapping_to_db()
+    return jsonify({"status": "ok", "message": f"同步完成，共 {count} 条记录"})
+
+
+@app.route("/api/mapping/export")
+def api_mapping_export():
+    """导出映射数据"""
+    data = load_mapping()
+    return jsonify(data)
+
+
 if __name__ == "__main__":
+    # 启动时同步映射到数据库
+    sync_mapping_to_db()
     app.run(host="0.0.0.0", port=5000, debug=False)
