@@ -407,6 +407,8 @@ def get_status():
         return jsonify(task_status)
 
 
+# 启动时同步映射数据（Gunicorn 和直接运行都会执行）
+sync_mapping_to_db()
+
 if __name__ == "__main__":
-    sync_mapping_to_db()
     app.run(host="0.0.0.0", port=5000, debug=False)
