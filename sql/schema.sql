@@ -62,12 +62,13 @@ CREATE TABLE IF NOT EXISTS douban_top250 (
 -- 豆瓣-IMDB 手动关联映射表
 CREATE TABLE IF NOT EXISTS douban_imdb_mapping (
     id INT AUTO_INCREMENT PRIMARY KEY,
+    douban_id VARCHAR(20) COMMENT '豆瓣 Subject ID',
     douban_ranking INT NOT NULL COMMENT '豆瓣排名',
     douban_title VARCHAR(255) NOT NULL COMMENT '豆瓣电影名',
     imdb_id VARCHAR(20) NOT NULL COMMENT '关联的 IMDB ID',
     note VARCHAR(500) COMMENT '备注说明',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    UNIQUE KEY uk_ranking (douban_ranking),
+    UNIQUE KEY uk_douban_id (douban_id),
     INDEX idx_imdb_id (imdb_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='豆瓣-IMDB 手动关联映射';
