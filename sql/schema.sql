@@ -52,10 +52,12 @@ CREATE TABLE IF NOT EXISTS imdb_top250 (
 -- 豆瓣 Top 250 表
 CREATE TABLE IF NOT EXISTS douban_top250 (
     id INT AUTO_INCREMENT PRIMARY KEY,
+    douban_id VARCHAR(20) COMMENT '豆瓣 Subject ID',
     ranking INT COMMENT '排名',
     title VARCHAR(255) COMMENT '电影名称',
     douban_link VARCHAR(255) COMMENT '豆瓣链接',
     imdb_id VARCHAR(20) COMMENT 'IMDB ID',
+    UNIQUE KEY uk_douban_id (douban_id),
     INDEX idx_imdb_id (imdb_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='豆瓣 Top 250';
 
