@@ -9,13 +9,14 @@ import subprocess
 import threading
 from datetime import datetime
 
+import requests
 from flask import Flask, render_template, jsonify, request
 import pymysql
 
 # 添加项目根目录到 path
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
-from config import DB_CONFIG, DATA_DIR
+from config import DB_CONFIG, DATA_DIR, EMBY_CONFIG
 
 app = Flask(__name__)
 
@@ -24,13 +25,18 @@ SCRIPTS = {
     "emby": os.path.join(PROJECT_ROOT, "scripts", "export_emby.py"),
     "imdb": os.path.join(PROJECT_ROOT, "scripts", "fetch_imdb_top250.py"),
     "douban": os.path.join(PROJECT_ROOT, "scripts", "fetch_douban_top250.py"),
+    "collections": os.path.join(PROJECT_ROOT, "scripts", "sync_collections.py"),
 }
 
 # 映射文件路径
 MAPPING_FILE = os.path.join(DATA_DIR, "douban_mapping.json")
 
+# Emby 合集配置
+EMBY_COLLECTIONS_PARENT_ID = "43626"
+TMDB_API_KEY = "81523b992fe340e47e22d1268deb7212"
+
 # 任务状态
-task_status = {"emby": None, "imdb": None, "douban": None}
+task_status = {"emby": None, "imdb": None, "douban": None, "collections": None}
 status_lock = threading.Lock()
 
 
@@ -174,6 +180,7 @@ def api_movies():
     sort_fields = {
         "title": "e.title", "year": "e.year", "rating": "e.rating",
         "imdb_rating": "e.imdb_rating", "imdb_votes": "e.imdb_votes",
+        "date_added": "e.date_added",
     }
     order_field = sort_fields.get(sort_by, "e.imdb_rating")
     order_dir = "DESC" if sort_order == "desc" else "ASC"
@@ -198,8 +205,11 @@ def api_movies():
     offset = (page - 1) * per_page
     data_sql = f"""
         SELECT
-            e.title, e.original_title, e.year, e.imdb_id, e.rating,
-            e.imdb_rating, e.imdb_votes, e.genres, e.directors, e.video_resolution,
+            e.title, e.original_title, e.year, e.imdb_id, e.tmdb_id, e.rating,
+            e.imdb_rating, e.imdb_votes, e.genres, e.studios, e.countries,
+            e.directors, e.actors, e.overview, e.runtime, e.release_date,
+            e.official_rating, e.video_codec, e.audio_codec, e.size,
+            e.path, e.tags, e.date_added, e.video_resolution,
             CASE
                 WHEN e.path LIKE '%%2160p%%' THEN '4K'
                 WHEN e.path LIKE '%%1080p%%' THEN '1080p'
@@ -401,10 +411,55 @@ def update_douban():
     return jsonify({"status": "started"})
 
 
+@app.route("/api/update/collections", methods=["POST"])
+def update_collections():
+    with status_lock:
+        s = task_status.get("collections") or {}
+        if s.get("status") == "running":
+            return jsonify({"status": "busy", "message": "任务正在执行中"})
+    thread = threading.Thread(target=run_task, args=("collections", [sys.executable, SCRIPTS["collections"]]))
+    thread.start()
+    return jsonify({"status": "started"})
+
+
 @app.route("/api/status")
 def get_status():
     with status_lock:
         return jsonify(task_status)
+
+
+# ========== 合集管理 API ==========
+
+@app.route("/api/collections")
+def api_collections():
+    """从数据库获取合集列表"""
+    rows = query("""
+        SELECT id, emby_id, name, tmdb_id, child_count, total_count, missing_count, overview
+        FROM emby_collections
+        ORDER BY name
+    """)
+    return jsonify({"collections": rows, "total": len(rows)})
+
+
+@app.route("/api/collections/<int:collection_id>")
+def api_collection_detail(collection_id):
+    """从数据库获取合集内的电影"""
+    movies = query("""
+        SELECT name, original_title, year, rating, imdb_rating, imdb_votes,
+               imdb_id, tmdb_id, overview, genres, directors, actors, studios,
+               video_codec, audio_codec, size, video_resolution, path, in_emby
+        FROM emby_collection_movies
+        WHERE collection_id = %s
+        ORDER BY in_emby DESC, year ASC
+    """, (collection_id,))
+
+    owned = [m for m in movies if m["in_emby"]]
+    missing = [m for m in movies if not m["in_emby"]]
+
+    return jsonify({
+        "movies": owned,
+        "missing": missing,
+    })
 
 
 # 启动时同步映射数据（Gunicorn 和直接运行都会执行）

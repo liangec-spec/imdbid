@@ -92,6 +92,21 @@
   .edit-btn { background: var(--accent); color: #000; border: none; padding: 4px 8px; border-radius: 4px; font-size: 12px; cursor: pointer; margin-left: 4px; }
   .edit-btn:hover { opacity: 0.8; }
   .edit-btn.delete { background: var(--red); }
+  /* 电影详情展开 */
+  .detail-row { display: none; }
+  .detail-row.active { display: table-row; }
+  .detail-cell { padding: 12px 16px; background: rgba(0,0,0,.2); }
+  .detail-content { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; font-size: 13px; }
+  .detail-item { display: flex; flex-direction: column; gap: 2px; }
+  .detail-label { color: var(--dim); font-size: 11px; text-transform: uppercase; }
+  .detail-value { color: var(--text); }
+  .clickable-row { cursor: pointer; }
+  .clickable-row:hover td { background: rgba(255,255,255,.03); }
+  .clickable-row td:first-child::before { content: '▶'; display: inline-block; margin-right: 6px; font-size: 10px; transition: transform 0.2s; }
+  .clickable-row.expanded td:first-child::before { transform: rotate(90deg); }
+  /* 合集展开 */
+  .collection-expand { display: none; }
+  .collection-expand.active { display: table-row; }
   @media (max-width: 768px) {
     .stats { flex-direction: column; align-items: center; }
     td, th { padding: 8px 10px; font-size: 13px; }
@@ -121,6 +136,7 @@
   <button class="update-btn btn-emby" onclick="triggerUpdate('emby')" id="btn-emby">🔄 更新 Emby 清单</button>
   <button class="update-btn btn-imdb" onclick="triggerUpdate('imdb')" id="btn-imdb">🔄 更新 IMDB 250</button>
   <button class="update-btn btn-douban" onclick="triggerUpdate('douban')" id="btn-douban">🔄 更新豆瓣 250</button>
+  <button class="update-btn btn-douban" onclick="triggerUpdate('collections')" id="btn-collections">🔄 更新电影合集</button>
 </div>
 <div class="status-bar" id="statusBar"></div>
 
@@ -143,6 +159,7 @@
   <div class="tab" onclick="switchTab(0)">📗 豆瓣 Top 250</div>
   <div class="tab" onclick="switchTab(1)">📙 IMDB Top 250</div>
   <div class="tab active" onclick="switchTab(2)">🎬 Emby 清单</div>
+  <div class="tab" onclick="switchTab(3)">📁 电影合集</div>
 </div>
 
 <!-- 豆瓣 Top 250 -->
@@ -228,6 +245,7 @@
         <th>IMDB ID</th>
         <th>分辨率</th>
         <th>位置</th>
+        <th class="sortable" data-col="date_added" onclick="changeSort('date_added')">加入日期 <span class="arrow up">▲</span><span class="arrow down">▼</span></th>
         <th>IMDB 250</th>
         <th>豆瓣 250</th>
         <th>导演</th>
@@ -239,6 +257,25 @@
   <div class="pagination" id="pagination"></div>
 </div>
 
+<!-- 电影合集 -->
+<div class="panel" id="panel-3">
+  <div class="top250-toolbar">
+    <input type="text" class="top250-search" id="collectionSearch" placeholder="🔍 搜索合集名称..." oninput="filterCollections()">
+  </div>
+  <div class="count" id="collectionCount">加载中...</div>
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>合集名称</th>
+        <th>电影数</th>
+        <th>TMDB ID</th>
+      </tr>
+    </thead>
+    <tbody id="collectionTbody"></tbody>
+  </table>
+</div>
+
 <script>
 // 状态
 let currentPage = 1;
@@ -247,6 +284,7 @@ let sortOrder = 'desc';
 let searchTimer = null;
 let doubanMovies = [];
 let imdbMovies = [];
+let collections = [];
 
 // 主题切换
 function switchTheme(theme) {
@@ -262,6 +300,7 @@ function switchTab(i) {
   // 懒加载
   if (i === 0 && doubanMovies.length === 0) loadTop250('douban');
   if (i === 1 && imdbMovies.length === 0) loadTop250('imdb');
+  if (i === 3 && collections.length === 0) loadCollections();
 }
 
 // 防抖搜索
@@ -317,21 +356,30 @@ function loadMovies(page) {
 // 渲染电影列表
 function renderMovies(movies) {
   const tbody = document.getElementById('embyTbody');
-  tbody.innerHTML = movies.map((m, i) => `
-    <tr>
-      <td>${(currentPage - 1) * 50 + i + 1}</td>
-      <td>${m.title}${m.original_title && m.original_title !== m.title ? `<br><span style="color:var(--dim);font-size:12px">${m.original_title}</span>` : ''}</td>
-      <td>${m.year || '-'}</td>
-      <td>${m.rating ? parseFloat(m.rating).toFixed(1) : '-'}</td>
-      <td>${m.imdb_rating ? `<span style="color:var(--yellow)">⭐ ${parseFloat(m.imdb_rating).toFixed(1)}</span>${m.imdb_votes ? `<br><span style="font-size:11px;color:var(--dim)">${m.imdb_votes.toLocaleString()}票</span>` : ''}` : '-'}</td>
-      <td>${m.imdb_id ? `<a href="https://www.imdb.com/title/${m.imdb_id}/" target="_blank">${m.imdb_id}</a>` : '-'}</td>
-      <td>${formatResolution(m.resolution_label)}</td>
-      <td>${m.location || '-'}</td>
-      <td>${m.in_imdb250 ? '<span class="badge badge-yes">✓ IMDB</span>' : '<span class="badge badge-no">-</span>'}</td>
-      <td>${m.in_douban250 ? '<span class="badge badge-yes">✓ 豆瓣</span>' : '<span class="badge badge-no">-</span>'}</td>
-      <td style="color:var(--dim);font-size:13px">${m.directors || '-'}</td>
-    </tr>
-  `).join('');
+  tbody.innerHTML = '';
+  movies.forEach((m, i) => {
+    const tr = document.createElement('tr');
+    tr.className = 'clickable-row';
+    tr.onclick = function() { toggleDetail(this); };
+    tr.innerHTML =
+      '<td>' + ((currentPage - 1) * 50 + i + 1) + '</td>' +
+      '<td>' + m.title + (m.original_title && m.original_title !== m.title ? '<br><span style="color:var(--dim);font-size:12px">' + m.original_title + '</span>' : '') + '</td>' +
+      '<td>' + (m.year || '-') + '</td>' +
+      '<td>' + (m.rating ? parseFloat(m.rating).toFixed(1) : '-') + '</td>' +
+      '<td>' + (m.imdb_rating ? '<span style="color:var(--yellow)">⭐ ' + parseFloat(m.imdb_rating).toFixed(1) + '</span>' + (m.imdb_votes ? '<br><span style="font-size:11px;color:var(--dim)">' + m.imdb_votes.toLocaleString() + '票</span>' : '') : '-') + '</td>' +
+      '<td>' + (m.imdb_id ? '<a href="https://www.imdb.com/title/' + m.imdb_id + '/" target="_blank">' + m.imdb_id + '</a>' : '-') + '</td>' +
+      '<td>' + formatResolution(m.resolution_label) + '</td>' +
+      '<td>' + (m.location || '-') + '</td>' +
+      '<td>' + (m.date_added || '-') + '</td>' +
+      '<td>' + (m.in_imdb250 ? '<span class="badge badge-yes">✓ IMDB</span>' : '<span class="badge badge-no">-</span>') + '</td>' +
+      '<td>' + (m.in_douban250 ? '<span class="badge badge-yes">✓ 豆瓣</span>' : '<span class="badge badge-no">-</span>') + '</td>' +
+      '<td style="color:var(--dim);font-size:13px">' + (m.directors || '-') + '</td>';
+    tbody.appendChild(tr);
+
+    // 添加详情行
+    const detailTr = createDetailRow(11, getMovieDetailHtml(m));
+    tbody.appendChild(detailTr);
+  });
 }
 
 // 格式化分辨率
@@ -554,7 +602,7 @@ function deleteMapping(doubanId) {
 }
 
 // ========== 更新功能 ==========
-const LABELS = {'emby': 'Emby清单', 'imdb': 'IMDB 250', 'douban': '豆瓣250'};
+const LABELS = {'emby': 'Emby清单', 'imdb': 'IMDB 250', 'douban': '豆瓣250', 'collections': '电影合集'};
 
 function triggerUpdate(type) {
   const btn = document.getElementById('btn-' + type);
@@ -606,6 +654,145 @@ function pollStatus(type) {
 function showStatus(type, msg) {
   const bar = document.getElementById('statusBar');
   bar.innerHTML = `<span class="status-msg status-${type}">${msg}</span>`;
+}
+
+// ========== 电影详情展开功能 ==========
+function toggleDetail(row) {
+  const nextRow = row.nextElementSibling;
+  if (nextRow && nextRow.classList.contains('detail-row')) {
+    nextRow.classList.toggle('active');
+    row.classList.toggle('expanded');
+  }
+}
+
+function createDetailRow(colCount, html) {
+  const tr = document.createElement('tr');
+  tr.className = 'detail-row';
+  tr.innerHTML = '<td colspan="' + colCount + '" class="detail-cell">' + html + '</td>';
+  return tr;
+}
+
+function getMovieDetailHtml(m) {
+  var actorsText = m.actors || '-';
+  var actorsHtml = actorsText.length > 40
+    ? '<span title="' + actorsText.replace(/"/g, '&quot;') + '">' + actorsText.substring(0, 40) + '...</span>'
+    : actorsText;
+  var tmdbLink = m.tmdb_id ? '<a href="https://www.themoviedb.org/movie/' + m.tmdb_id + '" target="_blank">TMDB:' + m.tmdb_id + '</a>' : '';
+
+  return '<div class="detail-content">' +
+    '<div class="detail-item" style="grid-column: 1 / -1"><span class="detail-label">简介</span><span class="detail-value">' + (m.overview || '-') + '</span></div>' +
+    '<div class="detail-item"><span class="detail-label">导演</span><span class="detail-value">' + (m.directors || '-') + '</span></div>' +
+    '<div class="detail-item"><span class="detail-label">演员</span><span class="detail-value">' + actorsHtml + '</span></div>' +
+    '<div class="detail-item"><span class="detail-label">类型</span><span class="detail-value">' + (m.genres || '-') + '</span></div>' +
+    '<div class="detail-item"><span class="detail-label">制片厂</span><span class="detail-value">' + (m.studios || '-') + '</span></div>' +
+    '<div class="detail-item"><span class="detail-label">文件大小</span><span class="detail-value">' + (m.size ? (m.size / 1073741824).toFixed(1) + ' GB' : '-') + '</span></div>' +
+    '<div class="detail-item"><span class="detail-label">编码</span><span class="detail-value">' + (m.video_codec || '-') + ' / ' + (m.audio_codec || '-') + (tmdbLink ? ' | ' + tmdbLink : '') + '</span></div>' +
+    '</div>';
+}
+
+// ========== 合集功能 ==========
+function loadCollections() {
+  document.getElementById('collectionCount').textContent = '加载中...';
+
+  fetch('/api/collections')
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) {
+        document.getElementById('collectionTbody').innerHTML = `<tr><td colspan="4" style="color:var(--red)">${data.error}</td></tr>`;
+        return;
+      }
+      collections = data.collections;
+      renderCollections(collections);
+      document.getElementById('collectionCount').textContent = `共 ${data.total} 个合集`;
+    })
+    .catch(err => {
+      document.getElementById('collectionTbody').innerHTML = `<tr><td colspan="4" style="color:var(--red)">加载失败: ${err}</td></tr>`;
+    });
+}
+
+function renderCollections(list) {
+  const tbody = document.getElementById('collectionTbody');
+  tbody.innerHTML = list.map((c, i) => `
+    <tr class="clickable-row" onclick="toggleCollection('${c.id}')">
+      <td>${i + 1}</td>
+      <td>📁 ${c.name}</td>
+      <td>${c.child_count || '-'}</td>
+      <td>${c.tmdb_id ? `<a href="https://www.themoviedb.org/collection/${c.tmdb_id}" target="_blank">${c.tmdb_id}</a>` : '-'}</td>
+    </tr>
+    <tr class="detail-row" id="col-${c.id}">
+      <td colspan="4" class="detail-cell">
+        <div class="collection-loading">加载中...</div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function toggleCollection(id) {
+  const detailRow = document.getElementById(`col-${id}`);
+  if (detailRow.classList.contains('active')) {
+    detailRow.classList.remove('active');
+    return;
+  }
+
+  detailRow.classList.add('active');
+  const cell = detailRow.querySelector('.detail-cell');
+
+  fetch(`/api/collections/${id}`)
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) {
+        cell.innerHTML = '<div style="color:var(--red)">' + data.error + '</div>';
+      } else {
+        let html = '';
+
+        // 已收录电影
+        if (data.movies.length > 0) {
+          html += '<div style="margin-bottom:12px;font-size:13px;color:var(--dim)">已收录 (' + data.movies.length + ')</div>';
+          html += '<table style="width:100%;margin:0;"><thead><tr><th>#</th><th>电影名称</th><th>年份</th><th>评分</th><th>IMDB评分</th><th>IMDB ID</th></tr></thead><tbody>';
+          data.movies.forEach((m, i) => {
+            var detailHtml = getMovieDetailHtml(m);
+            html += '<tr class="clickable-row" onclick="toggleDetail(this)">' +
+              '<td>' + (i + 1) + '</td>' +
+              '<td>' + m.name + (m.original_title && m.original_title !== m.name ? '<br><span style="color:var(--dim);font-size:12px">' + m.original_title + '</span>' : '') + '</td>' +
+              '<td>' + (m.year || '-') + '</td>' +
+              '<td>' + (m.rating ? '⭐ ' + parseFloat(m.rating).toFixed(1) : '-') + '</td>' +
+              '<td>' + (m.imdb_rating ? '⭐ ' + parseFloat(m.imdb_rating).toFixed(1) : '-') + '</td>' +
+              '<td>' + (m.imdb_id ? '<a href="https://www.imdb.com/title/' + m.imdb_id + '/" target="_blank">' + m.imdb_id + '</a>' : '-') + '</td>' +
+              '</tr>';
+            html += '<tr class="detail-row"><td colspan="6" class="detail-cell">' + detailHtml + '</td></tr>';
+          });
+          html += '</tbody></table>';
+        }
+
+        // 未收录电影
+        if (data.missing && data.missing.length > 0) {
+          html += '<div style="margin-top:16px;margin-bottom:12px;font-size:13px;color:var(--red)">未收录 (' + data.missing.length + ')</div>';
+          html += '<table style="width:100%;margin:0;"><thead><tr><th>#</th><th>电影名称</th><th>年份</th><th>评分</th><th>TMDB ID</th></tr></thead><tbody>';
+          data.missing.forEach((m, i) => {
+            html += '<tr style="opacity:0.6">' +
+              '<td>' + (i + 1) + '</td>' +
+              '<td>' + m.name + (m.original_title && m.original_title !== m.name ? '<br><span style="color:var(--dim);font-size:12px">' + m.original_title + '</span>' : '') + '</td>' +
+              '<td>' + (m.year || '-') + '</td>' +
+              '<td>' + (m.rating ? '⭐ ' + parseFloat(m.rating).toFixed(1) : '-') + '</td>' +
+              '<td><a href="https://www.themoviedb.org/movie/' + m.tmdb_id + '" target="_blank">' + m.tmdb_id + '</a></td>' +
+              '</tr>';
+          });
+          html += '</tbody></table>';
+        }
+
+        cell.innerHTML = html || '<div style="color:var(--dim)">无数据</div>';
+      }
+    })
+    .catch(err => {
+      cell.innerHTML = '<div style="color:var(--red)">加载失败: ' + err + '</div>';
+    });
+}
+
+function filterCollections() {
+  const search = document.getElementById('collectionSearch').value.toLowerCase();
+  const filtered = collections.filter(c => c.name.toLowerCase().includes(search));
+  renderCollections(filtered);
+  document.getElementById('collectionCount').textContent = `显示 ${filtered.length} / ${collections.length} 个合集`;
 }
 
 // 页面加载
