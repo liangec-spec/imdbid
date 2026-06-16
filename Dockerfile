@@ -25,6 +25,7 @@ COPY config/ config/
 COPY scripts/ scripts/
 COPY web/ web/
 COPY sql/ sql/
+COPY data/douban_mapping.json data/douban_mapping.json
 
 # 创建数据目录并设置权限
 RUN mkdir -p /app/data && chown -R appuser:appuser /app
