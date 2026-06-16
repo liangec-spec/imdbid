@@ -8,11 +8,10 @@ import sys
 import requests
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from config import DB_CONFIG, EMBY_CONFIG
+from config import DB_CONFIG, EMBY_CONFIG, TMDB_API_KEY
 import pymysql
 
-EMBY_COLLECTIONS_PARENT_ID = "43626"
-TMDB_API_KEY = "81523b992fe340e47e22d1268deb7212"
+EMBY_COLLECTIONS_PARENT_ID = os.getenv("EMBY_COLLECTIONS_PARENT_ID", "43626")
 
 
 def get_emby_collections(server, api_key):

@@ -20,6 +20,9 @@ EMBY_CONFIG = {
     "parent_id": os.getenv("EMBY_PARENT_ID", ""),
 }
 
+# TMDB 配置
+TMDB_API_KEY = os.getenv("TMDB_API_KEY", "")
+
 # IMDB 数据集 URL
 IMDB_DATASETS = {
     "ratings": "https://datasets.imdbws.com/title.ratings.tsv.gz",

@@ -16,7 +16,7 @@ import pymysql
 # 添加项目根目录到 path
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
-from config import DB_CONFIG, DATA_DIR, EMBY_CONFIG
+from config import DB_CONFIG, DATA_DIR, EMBY_CONFIG, TMDB_API_KEY
 
 app = Flask(__name__)
 
@@ -32,8 +32,7 @@ SCRIPTS = {
 MAPPING_FILE = os.path.join(DATA_DIR, "douban_mapping.json")
 
 # Emby 合集配置
-EMBY_COLLECTIONS_PARENT_ID = "43626"
-TMDB_API_KEY = "81523b992fe340e47e22d1268deb7212"
+EMBY_COLLECTIONS_PARENT_ID = os.getenv("EMBY_COLLECTIONS_PARENT_ID", "43626")
 
 # 任务状态
 task_status = {"emby": None, "imdb": None, "douban": None, "collections": None}
