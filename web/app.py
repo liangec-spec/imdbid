@@ -443,15 +443,42 @@ def api_collections():
 
 @app.route("/api/collections/<int:collection_id>")
 def api_collection_detail(collection_id):
-    """从数据库获取合集内的电影"""
+    """从数据库获取合集内的电影，关联 emby_movies 获取完整信息"""
     movies = query("""
-        SELECT name, original_title, year, rating, imdb_rating, imdb_votes,
-               imdb_id, tmdb_id, overview, genres, directors, actors, studios,
-               video_codec, audio_codec, size, video_resolution, path, in_emby
-        FROM emby_collection_movies
-        WHERE collection_id = %s
-        ORDER BY in_emby DESC, year ASC
+        SELECT c.name, c.original_title, c.year, c.rating, c.imdb_rating, c.imdb_votes,
+               c.imdb_id, c.tmdb_id, c.overview, c.genres, c.directors, c.actors, c.studios,
+               c.video_codec, c.audio_codec, c.size, c.video_resolution, c.path, c.in_emby,
+               e.imdb_rating AS emby_imdb_rating, e.imdb_votes AS emby_imdb_votes
+        FROM emby_collection_movies c
+        LEFT JOIN emby_movies e ON c.imdb_id = e.imdb_id
+        WHERE c.collection_id = %s
+        ORDER BY c.in_emby DESC, c.year ASC
     """, (collection_id,))
+
+    # 补充 IMDB 评分
+    for m in movies:
+        if not m.get("imdb_rating") and m.get("emby_imdb_rating"):
+            m["imdb_rating"] = m["emby_imdb_rating"]
+        if not m.get("imdb_votes") and m.get("emby_imdb_votes"):
+            m["imdb_votes"] = m["emby_imdb_votes"]
+
+        # 计算分辨率标签和位置
+        path = m.get("path") or ""
+        if "2160p" in path:
+            m["resolution_label"] = "4K"
+        elif "1080p" in path:
+            m["resolution_label"] = "1080p"
+        elif "720p" in path:
+            m["resolution_label"] = "720p"
+        else:
+            m["resolution_label"] = m.get("video_resolution", "-")
+
+        # 提取位置
+        if path:
+            parts = path.split("\\")
+            m["location"] = parts[3] if len(parts) > 3 else "-"
+        else:
+            m["location"] = "-"
 
     owned = [m for m in movies if m["in_emby"]]
     missing = [m for m in movies if not m["in_emby"]]
