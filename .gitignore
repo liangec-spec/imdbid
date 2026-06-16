@@ -16,8 +16,9 @@ venv/
 .idea/
 
 # 生成的数据文件
-data/
+data/*.csv
 *.csv
+!data/douban_mapping.json
 
 # 日志
 *.log
