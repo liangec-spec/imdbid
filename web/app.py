@@ -217,13 +217,18 @@ def api_movies():
                 ELSE IFNULL(e.video_resolution, '-')
             END AS resolution_label,
             SUBSTRING_INDEX(SUBSTRING_INDEX(e.path, '\\\\', 4), '\\\\', -1) AS location,
-            CASE WHEN i.imdb_id IS NOT NULL THEN 1 ELSE 0 END AS in_imdb250,
+            CASE WHEN i.id IS NOT NULL THEN (SELECT COUNT(*)+1 FROM imdb_top250 i2 WHERE i2.id < i.id) ELSE NULL END AS imdb_rank,
             CASE WHEN EXISTS (
                 SELECT 1 FROM douban_top250 d
                 LEFT JOIN douban_imdb_mapping map ON d.douban_id = map.douban_id
                 WHERE COALESCE(map.imdb_id, d.imdb_id) = e.imdb_id
                    OR d.title LIKE CONCAT(e.title, '%%')
-            ) THEN 1 ELSE 0 END AS in_douban250
+            ) THEN 1 ELSE 0 END AS in_douban250,
+            (SELECT d.ranking FROM douban_top250 d
+             LEFT JOIN douban_imdb_mapping map ON d.douban_id = map.douban_id
+             WHERE COALESCE(map.imdb_id, d.imdb_id) = e.imdb_id
+                OR d.title LIKE CONCAT(e.title, '%%')
+             LIMIT 1) AS douban_rank
         FROM emby_movies e {imdb_join}
         WHERE {where_sql} {douban_filter}
         ORDER BY {order_field} {order_dir}
