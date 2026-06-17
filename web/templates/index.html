@@ -5,884 +5,703 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Emby 电影管理</title>
 <style>
-  :root { --bg: #0f172a; --card: #1e293b; --accent: #38bdf8; --text: #e2e8f0; --dim: #94a3b8; --green: #4ade80; --red: #f87171; --yellow: #fbbf24; }
-  /* 配色方案 */
-  [data-theme="midnight"] { --bg: #0f172a; --card: #1e293b; --accent: #38bdf8; --text: #e2e8f0; --dim: #94a3b8; --green: #4ade80; --red: #f87171; --yellow: #fbbf24; }
-  [data-theme="emerald"] { --bg: #0a1f1a; --card: #14332a; --accent: #34d399; --text: #e2e8f0; --dim: #86978e; --green: #6ee7b7; --red: #fca5a5; --yellow: #fcd34d; }
-  [data-theme="sunset"] { --bg: #1c1117; --card: #2d1f2b; --accent: #f472b6; --text: #fce7f3; --dim: #a8899a; --green: #86efac; --red: #fca5a5; --yellow: #fde68a; }
-  [data-theme="ocean"] { --bg: #0c1524; --card: #162236; --accent: #60a5fa; --text: #dbeafe; --dim: #7a96b8; --green: #4ade80; --red: #fb7185; --yellow: #facc15; }
-  [data-theme="purple"] { --bg: #1a1025; --card: #2a1d3a; --accent: #a78bfa; --text: #ede9fe; --dim: #8b7fa8; --green: #86efac; --red: #fca5a5; --yellow: #fde68a; }
-  [data-theme="light"] { --bg: #f8fafc; --card: #ffffff; --accent: #3b82f6; --text: #1e293b; --dim: #64748b; --green: #22c55e; --red: #ef4444; --yellow: #eab308; }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
-  .header { text-align: center; padding: 40px 20px 20px; }
-  .header h1 { font-size: 28px; font-weight: 700; }
-  .header p { color: var(--dim); margin-top: 8px; }
-  .theme-switcher { margin-top: 12px; }
-  .theme-switcher select { background: var(--card); color: var(--text); border: 1px solid rgba(255,255,255,.1); padding: 6px 12px; border-radius: 6px; font-size: 14px; cursor: pointer; outline: none; }
-  .theme-switcher select:focus { border-color: var(--accent); }
-  .stats { display: flex; justify-content: center; gap: 24px; margin: 24px auto; flex-wrap: wrap; }
-  .stat { background: var(--card); border-radius: 12px; padding: 20px 32px; text-align: center; min-width: 200px; }
-  .stat .num { font-size: 36px; font-weight: 700; color: var(--accent); }
-  .stat .label { color: var(--dim); font-size: 14px; margin-top: 4px; }
-  .update-bar { display: flex; justify-content: center; gap: 12px; margin: 20px auto; flex-wrap: wrap; }
-  .update-btn { padding: 10px 20px; border-radius: 8px; border: none; font-size: 14px; font-weight: 600; cursor: pointer; transition: all .2s; display: flex; align-items: center; gap: 8px; }
-  .update-btn:disabled { opacity: .6; cursor: not-allowed; }
-  .btn-emby { background: var(--green); color: #000; }
-  .btn-emby:hover:not(:disabled) { background: #22c55e; }
-  .btn-imdb { background: var(--yellow); color: #000; }
-  .btn-imdb:hover:not(:disabled) { background: #f59e0b; }
-  .btn-douban { background: var(--accent); color: #000; }
-  .btn-douban:hover:not(:disabled) { background: #0ea5e9; }
-  .status-bar { text-align: center; margin: 8px 0; min-height: 24px; }
-  .status-msg { font-size: 13px; padding: 4px 12px; border-radius: 6px; display: inline-block; }
-  .status-running { background: rgba(251,191,36,.15); color: var(--yellow); }
-  .status-done { background: rgba(74,222,128,.15); color: var(--green); }
-  .status-error { background: rgba(248,113,113,.15); color: var(--red); }
-  .tabs { display: flex; justify-content: center; gap: 8px; margin: 24px 20px 0; flex-wrap: wrap; }
-  .tab { padding: 10px 24px; border-radius: 8px; background: var(--card); color: var(--dim); cursor: pointer; font-size: 15px; border: 2px solid transparent; transition: all .2s; user-select: none; }
-  .tab:hover { color: var(--text); }
-  .tab.active { border-color: var(--accent); color: var(--accent); background: rgba(56,189,248,.08); }
-  .panel { display: none; max-width: 1200px; margin: 20px auto; padding: 0 20px; }
-  .panel.active { display: block; }
-  table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: 12px; overflow: hidden; }
-  th { background: rgba(56,189,248,.1); color: var(--accent); text-align: left; padding: 12px 16px; font-size: 13px; text-transform: uppercase; letter-spacing: .5px; white-space: nowrap; }
-  th.sortable { cursor: pointer; user-select: none; }
-  th.sortable:hover { background: rgba(56,189,248,.2); }
-  th .arrow { font-size: 10px; margin-left: 4px; opacity: .3; }
-  th.sorted-asc .arrow.up, th.sorted-desc .arrow.down { opacity: 1; color: var(--green); }
-  td { padding: 10px 16px; border-top: 1px solid rgba(255,255,255,.05); font-size: 14px; }
-  tr:hover td { background: rgba(255,255,255,.03); }
-  a { color: var(--accent); text-decoration: none; }
-  a:hover { text-decoration: underline; }
-  .badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 99px; font-weight: 600; }
-  .badge-yes { background: var(--green); color: #000; }
-  .badge-no { background: rgba(255,255,255,.08); color: var(--dim); }
-  .count { text-align: center; margin: 16px 0; color: var(--dim); font-size: 14px; }
-  .toolbar { display: flex; justify-content: center; align-items: center; gap: 20px; margin: 16px 20px; flex-wrap: wrap; }
-  .search-box input { background: var(--card); border: 1px solid rgba(255,255,255,.1); color: var(--text); padding: 8px 16px; border-radius: 8px; width: 260px; font-size: 14px; outline: none; }
-  .search-box input:focus { border-color: var(--accent); }
-  .filters { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
-  .filters label { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 14px; color: var(--dim); }
-  .filters label:hover { color: var(--text); }
-  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(0,0,0,.3); border-top-color: #000; border-radius: 50%; animation: spin .6s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  /* 分页样式 */
-  .pagination { display: flex; justify-content: center; align-items: center; gap: 8px; margin: 20px 0; }
-  .pagination button { background: var(--card); color: var(--text); border: 1px solid rgba(255,255,255,.1); padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px; transition: all .2s; }
-  .pagination button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
-  .pagination button:disabled { opacity: .4; cursor: not-allowed; }
-  .pagination button.active { background: var(--accent); color: #000; border-color: var(--accent); }
-  .pagination .page-info { color: var(--dim); font-size: 14px; }
-  .loading { text-align: center; padding: 40px; color: var(--dim); }
-  /* Top 250 表格样式 */
-  .top250-toolbar { display: flex; justify-content: center; align-items: center; gap: 20px; margin: 16px 20px; flex-wrap: wrap; }
-  .top250-search { background: var(--card); border: 1px solid rgba(255,255,255,.1); color: var(--text); padding: 8px 16px; border-radius: 8px; width: 260px; font-size: 14px; outline: none; }
-  .top250-search:focus { border-color: var(--accent); }
-  .missing-row { opacity: 0.5; }
-  .status-badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 600; }
-  .status-owned { background: rgba(74,222,128,.2); color: var(--green); }
-  .status-missing { background: rgba(248,113,113,.2); color: var(--red); }
-  .status-manual { background: rgba(251,191,36,.2); color: var(--yellow); }
-  .source-badge { display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 3px; margin-left: 4px; }
-  .source-auto { background: rgba(56,189,248,.15); color: var(--accent); }
-  .source-manual { background: rgba(251,191,36,.15); color: var(--yellow); }
-  /* 编辑输入框 */
-  .edit-input { background: var(--bg); border: 1px solid var(--accent); color: var(--text); padding: 4px 8px; border-radius: 4px; font-size: 12px; width: 100px; }
-  .edit-btn { background: var(--accent); color: #000; border: none; padding: 4px 8px; border-radius: 4px; font-size: 12px; cursor: pointer; margin-left: 4px; }
-  .edit-btn:hover { opacity: 0.8; }
-  .edit-btn.delete { background: var(--red); }
-  /* 电影详情展开 */
-  .detail-row { display: none; }
-  .detail-row.active { display: table-row; }
-  .detail-cell { padding: 12px 16px; background: rgba(0,0,0,.2); }
-  .detail-content { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; font-size: 13px; }
-  .detail-item { display: flex; flex-direction: column; gap: 2px; }
-  .detail-label { color: var(--dim); font-size: 11px; text-transform: uppercase; }
-  .detail-value { color: var(--text); }
-  .clickable-row { cursor: pointer; }
-  .clickable-row:hover td { background: rgba(255,255,255,.03); }
-  .clickable-row td:first-child::before { content: '▶'; display: inline-block; margin-right: 6px; font-size: 10px; transition: transform 0.2s; }
-  .clickable-row.expanded td:first-child::before { transform: rotate(90deg); }
-  /* 合集展开 */
-  .collection-expand { display: none; }
-  .collection-expand.active { display: table-row; }
-  @media (max-width: 768px) {
-    .stats { flex-direction: column; align-items: center; }
-    td, th { padding: 8px 10px; font-size: 13px; }
-    .search-box input, .top250-search { width: 100%; }
-  }
+:root {
+  --bg: #f5f7fa; --bg2: #ffffff; --bg3: #e8ecf1;
+  --accent: #3b82f6; --accent2: #2563eb;
+  --text: #1e293b; --dim: #64748b; --dim2: #94a3b8;
+  --green: #16a34a; --red: #dc2626; --yellow: #d97706;
+  --sidebar-w: 220px; --header-h: 56px;
+  --radius: 8px; --radius-lg: 12px;
+  --border: #e2e8f0;
+}
+[data-theme="dark"] {
+  --bg: #0f172a; --bg2: #1e293b; --bg3: #334155;
+  --accent: #38bdf8; --accent2: #0ea5e9;
+  --text: #e2e8f0; --dim: #94a3b8; --dim2: #64748b;
+  --green: #4ade80; --red: #f87171; --yellow: #fbbf24;
+  --border: rgba(255,255,255,.08);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; background:var(--bg); color:var(--text); min-height:100vh; display:flex; }
+
+/* ===== 侧边栏 ===== */
+.sidebar { width:var(--sidebar-w); background:var(--bg2); border-right:1px solid var(--border); display:flex; flex-direction:column; position:fixed; top:0; left:0; bottom:0; z-index:100; transition:transform .2s; }
+.sidebar-header { padding:20px 16px 12px; border-bottom:1px solid rgba(255,255,255,.06); }
+.sidebar-header h1 { font-size:18px; font-weight:700; }
+.sidebar-header p { font-size:12px; color:var(--dim); margin-top:4px; }
+.sidebar-nav { flex:1; padding:12px 8px; overflow-y:auto; }
+.nav-item { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:var(--radius); cursor:pointer; font-size:14px; color:var(--dim); transition:all .15s; margin-bottom:2px; }
+.nav-item:hover { color:var(--text); background:rgba(255,255,255,.05); }
+.nav-item.active { color:var(--accent); background:rgba(56,189,248,.1); font-weight:600; }
+.nav-item .icon { font-size:18px; width:24px; text-align:center; }
+.nav-item .badge { margin-left:auto; font-size:11px; padding:1px 6px; border-radius:10px; background:rgba(255,255,255,.1); }
+.sidebar-footer { padding:12px 16px; border-top:1px solid rgba(255,255,255,.06); }
+.theme-select { width:100%; background:var(--bg); color:var(--text); border:1px solid var(--border); padding:6px 10px; border-radius:var(--radius); font-size:13px; cursor:pointer; }
+
+/* ===== 主内容 ===== */
+.main { flex:1; margin-left:var(--sidebar-w); min-height:100vh; }
+.topbar { height:var(--header-h); background:var(--bg2); border-bottom:1px solid rgba(255,255,255,.06); display:flex; align-items:center; justify-content:space-between; padding:0 24px; position:sticky; top:0; z-index:50; }
+.topbar-left { display:flex; align-items:center; gap:16px; }
+.topbar-title { font-size:16px; font-weight:600; }
+.topbar-right { display:flex; align-items:center; gap:8px; }
+.btn { padding:7px 14px; border-radius:var(--radius); border:none; font-size:13px; font-weight:500; cursor:pointer; transition:all .15s; display:inline-flex; align-items:center; gap:6px; }
+.btn:disabled { opacity:.5; cursor:not-allowed; }
+.btn-primary { background:var(--accent); color:#000; }
+.btn-primary:hover:not(:disabled) { background:var(--accent2); }
+.btn-ghost { background:transparent; color:var(--dim); border:1px solid var(--border); }
+.btn-ghost:hover:not(:disabled) { color:var(--text); border-color:var(--dim); }
+.spinner { display:inline-block; width:12px; height:12px; border:2px solid rgba(0,0,0,.3); border-top-color:#000; border-radius:50%; animation:spin .6s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+
+/* ===== 内容区 ===== */
+.content { padding:20px 24px; }
+.page { display:none; }
+.page.active { display:block; }
+
+/* 统计卡片 */
+.stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-bottom:20px; }
+.stat-card { background:var(--bg2); border-radius:var(--radius-lg); padding:16px 20px; border:1px solid var(--border); }
+.stat-card .num { font-size:28px; font-weight:700; color:var(--accent); }
+.stat-card .label { font-size:12px; color:var(--dim); margin-top:2px; }
+
+/* 工具栏 */
+.toolbar { display:flex; align-items:center; gap:12px; margin-bottom:16px; flex-wrap:wrap; }
+.search-input { background:var(--bg2); border:1px solid var(--border); color:var(--text); padding:7px 14px; border-radius:var(--radius); font-size:13px; width:260px; outline:none; }
+.search-input:focus { border-color:var(--accent); }
+.filter-group { display:flex; gap:6px; }
+.filter-btn { padding:5px 12px; border-radius:var(--radius); border:1px solid var(--border); background:transparent; color:var(--dim); font-size:12px; cursor:pointer; transition:all .15s; }
+.filter-btn:hover { color:var(--text); border-color:var(--dim); }
+.filter-btn.active { background:var(--accent); color:#000; border-color:var(--accent); }
+.count-info { margin-left:auto; font-size:13px; color:var(--dim); }
+
+/* 表格 */
+.table-wrap { background:var(--bg2); border-radius:var(--radius-lg); overflow:hidden; border:1px solid var(--border); }
+table { width:100%; border-collapse:collapse; }
+th { background:rgba(255,255,255,.03); color:var(--dim); text-align:left; padding:10px 14px; font-size:12px; text-transform:uppercase; letter-spacing:.5px; white-space:nowrap; position:sticky; top:var(--header-h); z-index:10; }
+th.sortable { cursor:pointer; user-select:none; }
+th.sortable:hover { color:var(--text); background:rgba(255,255,255,.05); }
+th .arrow { font-size:9px; margin-left:3px; opacity:.3; }
+th.sorted-asc .arrow.up, th.sorted-desc .arrow.down { opacity:1; color:var(--green); }
+td { padding:9px 14px; border-top:1px solid rgba(255,255,255,.04); font-size:13px; }
+tr:hover td { background:rgba(255,255,255,.02); }
+.clickable-row { cursor:pointer; }
+.clickable-row td:first-child::before { content:'▶'; display:inline-block; margin-right:5px; font-size:9px; transition:transform .2s; color:var(--dim); }
+.clickable-row.expanded td:first-child::before { transform:rotate(90deg); }
+.detail-row { display:none; }
+.detail-row.active { display:table-row; }
+.detail-cell { padding:12px 14px; background:rgba(0,0,0,.15); }
+.detail-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px; font-size:12px; }
+.detail-item { display:flex; flex-direction:column; gap:2px; }
+.detail-label { color:var(--dim2); font-size:10px; text-transform:uppercase; letter-spacing:.5px; }
+.detail-value { color:var(--text); }
+a { color:var(--accent); text-decoration:none; }
+a:hover { text-decoration:underline; }
+.badge { display:inline-block; font-size:10px; padding:2px 7px; border-radius:10px; font-weight:600; }
+.badge-green { background:rgba(74,222,128,.15); color:var(--green); }
+.badge-red { background:rgba(248,113,113,.15); color:var(--red); }
+.badge-yellow { background:rgba(251,191,36,.15); color:var(--yellow); }
+
+/* 分页 */
+.pagination { display:flex; justify-content:center; align-items:center; gap:6px; margin-top:16px; }
+.pagination button { background:var(--bg2); color:var(--text); border:1px solid var(--border); padding:6px 12px; border-radius:var(--radius); cursor:pointer; font-size:13px; transition:all .15s; }
+.pagination button:hover:not(:disabled) { border-color:var(--accent); color:var(--accent); }
+.pagination button:disabled { opacity:.3; cursor:not-allowed; }
+.pagination button.active { background:var(--accent); color:#000; border-color:var(--accent); }
+.pagination .info { color:var(--dim); font-size:13px; }
+
+/* 状态消息 */
+.status-bar { text-align:center; min-height:24px; }
+.status-msg { font-size:12px; padding:3px 10px; border-radius:var(--radius); display:inline-block; }
+.status-running { background:rgba(251,191,36,.12); color:var(--yellow); }
+.status-done { background:rgba(74,222,128,.12); color:var(--green); }
+.status-error { background:rgba(248,113,113,.12); color:var(--red); }
+
+/* 移动端 */
+@media (max-width:768px) {
+  .sidebar { transform:translateX(-100%); }
+  .sidebar.open { transform:translateX(0); }
+  .main { margin-left:0; }
+  .menu-btn { display:inline-flex !important; }
+  .search-input { width:100%; }
+}
+.menu-btn { display:none; }
 </style>
 </head>
 <body>
 
-<div class="header">
-  <h1>🎬 Emby 电影管理</h1>
-  <p>对比豆瓣 / IMDB Top 250，查看 Emby 库电影清单</p>
-  <div class="theme-switcher">
-    <select id="themeSelect" onchange="switchTheme(this.value)">
-      <option value="midnight">🌙 午夜蓝</option>
-      <option value="emerald">💚 翡翠绿</option>
-      <option value="sunset">🌅 日落粉</option>
-      <option value="ocean">🌊 海洋蓝</option>
-      <option value="purple">💜 星空紫</option>
-      <option value="light">☀️ 浅色模式</option>
+<!-- 侧边栏 -->
+<nav class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <h1>🎬 Emby Manager</h1>
+    <p>电影库管理工具</p>
+  </div>
+  <div class="sidebar-nav">
+    <div class="nav-item" onclick="switchPage('overview')">
+      <span class="icon">📊</span><span>概览</span>
+    </div>
+    <div class="nav-item active" onclick="switchPage('movies')">
+      <span class="icon">🎬</span><span>电影</span>
+      <span class="badge" id="navMovieCount">{{ emby_total }}</span>
+    </div>
+    <div class="nav-item" onclick="switchPage('douban')">
+      <span class="icon">📗</span><span>豆瓣 Top 250</span>
+      <span class="badge" id="navDoubanMissing">{{ douban_missing_count }}</span>
+    </div>
+    <div class="nav-item" onclick="switchPage('imdb')">
+      <span class="icon">📙</span><span>IMDB Top 250</span>
+      <span class="badge" id="navImdbMissing">{{ imdb_missing_count }}</span>
+    </div>
+    <div class="nav-item" onclick="switchPage('collections')">
+      <span class="icon">📁</span><span>合集</span>
+    </div>
+  </div>
+  <div class="sidebar-footer">
+    <select class="theme-select" id="themeSelect" onchange="switchTheme(this.value)">
+      <option value="light">☀️ 亮色主题</option>
+      <option value="dark">🌙 暗色主题</option>
     </select>
   </div>
-</div>
+</nav>
 
-<!-- 更新按钮 -->
-<div class="update-bar">
-  <button class="update-btn btn-emby" onclick="triggerUpdate('emby')" id="btn-emby">🔄 更新 Emby 清单</button>
-  <button class="update-btn btn-imdb" onclick="triggerUpdate('imdb')" id="btn-imdb">🔄 更新 IMDB 250</button>
-  <button class="update-btn btn-douban" onclick="triggerUpdate('douban')" id="btn-douban">🔄 更新豆瓣 250</button>
-  <button class="update-btn btn-douban" onclick="triggerUpdate('collections')" id="btn-collections">🔄 更新电影合集</button>
-</div>
-<div class="status-bar" id="statusBar"></div>
-
-<div class="stats">
-  <div class="stat">
-    <div class="num" id="doubanMissing">{{ douban_missing_count }}<span style="font-size:18px;color:var(--dim)"> / {{ douban_total }}</span></div>
-    <div class="label">豆瓣 Top250 缺失</div>
-  </div>
-  <div class="stat">
-    <div class="num" id="imdbMissing">{{ imdb_missing_count }}<span style="font-size:18px;color:var(--dim)"> / {{ imdb_total }}</span></div>
-    <div class="label">IMDB Top250 缺失</div>
-  </div>
-  <div class="stat">
-    <div class="num" id="embyTotal">{{ emby_total }}</div>
-    <div class="label">Emby 电影总数</div>
-  </div>
-</div>
-
-<div class="tabs">
-  <div class="tab" onclick="switchTab(0)">📗 豆瓣 Top 250</div>
-  <div class="tab" onclick="switchTab(1)">📙 IMDB Top 250</div>
-  <div class="tab active" onclick="switchTab(2)">🎬 Emby 清单</div>
-  <div class="tab" onclick="switchTab(3)">📁 电影合集</div>
-</div>
-
-<!-- 豆瓣 Top 250 -->
-<div class="panel" id="panel-0">
-  <div class="top250-toolbar">
-    <input type="text" class="top250-search" id="doubanSearch" placeholder="🔍 搜索电影名称..." oninput="filterTop250('douban')">
-    <div class="filters">
-      <label><input type="radio" name="doubanFilter" value="all" onchange="filterTop250('douban')" checked> 全部</label>
-      <label><input type="radio" name="doubanFilter" value="owned" onchange="filterTop250('douban')"> 已收录</label>
-      <label><input type="radio" name="doubanFilter" value="missing" onchange="filterTop250('douban')"> 未收录</label>
-      <label><input type="radio" name="doubanFilter" value="noimdb" onchange="filterTop250('douban')"> 无 IMDB ID</label>
+<!-- 主内容 -->
+<div class="main">
+  <div class="topbar">
+    <div class="topbar-left">
+      <button class="btn btn-ghost menu-btn" onclick="toggleSidebar()">☰</button>
+      <span class="topbar-title" id="pageTitle">概览</span>
+    </div>
+    <div class="topbar-right">
+      <div class="status-bar" id="statusBar"></div>
+      <button class="btn btn-ghost" onclick="triggerUpdate('emby')" id="btn-emby">🔄 Emby</button>
+      <button class="btn btn-ghost" onclick="triggerUpdate('imdb')" id="btn-imdb">🔄 IMDB</button>
+      <button class="btn btn-ghost" onclick="triggerUpdate('douban')" id="btn-douban">🔄 豆瓣</button>
+      <button class="btn btn-ghost" onclick="triggerUpdate('collections')" id="btn-collections">🔄 合集</button>
     </div>
   </div>
-  <div class="count" id="doubanCount">加载中...</div>
-  <table>
-    <thead>
-      <tr>
-        <th>#</th>
-        <th>排名</th>
-        <th>电影名称</th>
-        <th>年份</th>
-        <th>IMDB 评分</th>
-        <th>IMDB ID</th>
-        <th>操作</th>
-        <th>状态</th>
-      </tr>
-    </thead>
-    <tbody id="doubanTbody"></tbody>
-  </table>
-</div>
 
-<!-- IMDB Top 250 -->
-<div class="panel" id="panel-1">
-  <div class="top250-toolbar">
-    <input type="text" class="top250-search" id="imdbSearch" placeholder="🔍 搜索电影名称..." oninput="filterTop250('imdb')">
-    <div class="filters">
-      <label><input type="radio" name="imdbFilter" value="all" onchange="filterTop250('imdb')" checked> 全部</label>
-      <label><input type="radio" name="imdbFilter" value="owned" onchange="filterTop250('imdb')"> 已收录</label>
-      <label><input type="radio" name="imdbFilter" value="missing" onchange="filterTop250('imdb')"> 未收录</label>
+  <div class="content">
+    <!-- 概览页 -->
+    <div class="page" id="page-overview">
+      <div class="stats">
+        <div class="stat-card">
+          <div class="num">{{ emby_total }}</div>
+          <div class="label">Emby 电影总数</div>
+        </div>
+        <div class="stat-card">
+          <div class="num">{{ imdb_missing_count }}<span style="font-size:16px;color:var(--dim)"> / {{ imdb_total }}</span></div>
+          <div class="label">IMDB Top 250 缺失</div>
+        </div>
+        <div class="stat-card">
+          <div class="num">{{ douban_missing_count }}<span style="font-size:16px;color:var(--dim)"> / {{ douban_total }}</span></div>
+          <div class="label">豆瓣 Top 250 缺失</div>
+        </div>
+        <div class="stat-card">
+          <div class="num" id="collectionCount">-</div>
+          <div class="label">电影合集</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 电影页 -->
+    <div class="page active" id="page-movies">
+      <div class="toolbar">
+        <input type="text" class="search-input" id="movieSearch" placeholder="🔍 搜索电影名称或 IMDB ID..." oninput="debounceMovieSearch()">
+        <div class="filter-group">
+          <button class="filter-btn active" data-filter="all" onclick="setMovieFilter(this,'all')">全部</button>
+          <button class="filter-btn" data-filter="imdb" onclick="setMovieFilter(this,'imdb')">IMDB 250</button>
+          <button class="filter-btn" data-filter="douban" onclick="setMovieFilter(this,'douban')">豆瓣 250</button>
+          <button class="filter-btn" data-filter="both" onclick="setMovieFilter(this,'both')">两者都在</button>
+        </div>
+        <span class="count-info" id="movieCount">-</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th class="sortable" data-col="title" onclick="changeMovieSort('title')">电影名称 <span class="arrow up">▲</span><span class="arrow down">▼</span></th>
+              <th class="sortable" data-col="year" onclick="changeMovieSort('year')">年份 <span class="arrow up">▲</span><span class="arrow down">▼</span></th>
+              <th class="sortable" data-col="imdb_rating" onclick="changeMovieSort('imdb_rating')">IMDB评分 <span class="arrow up">▲</span><span class="arrow down">▼</span></th>
+              <th>IMDB ID</th>
+              <th>TMDB ID</th>
+              <th>分辨率</th>
+              <th>位置</th>
+              <th class="sortable" data-col="date_added" onclick="changeMovieSort('date_added')">加入日期 <span class="arrow up">▲</span><span class="arrow down">▼</span></th>
+              <th>IMDB</th>
+              <th>豆瓣</th>
+            </tr>
+          </thead>
+          <tbody id="movieTbody"></tbody>
+        </table>
+      </div>
+      <div class="pagination" id="moviePagination"></div>
+    </div>
+
+    <!-- 豆瓣 Top 250 -->
+    <div class="page" id="page-douban">
+      <div class="toolbar">
+        <input type="text" class="search-input" id="doubanSearch" placeholder="🔍 搜索电影名称..." oninput="filterDouban()">
+        <div class="filter-group">
+          <button class="filter-btn active" data-filter="all" onclick="setDoubanFilter(this,'all')">全部</button>
+          <button class="filter-btn" data-filter="owned" onclick="setDoubanFilter(this,'owned')">已收录</button>
+          <button class="filter-btn" data-filter="missing" onclick="setDoubanFilter(this,'missing')">未收录</button>
+          <button class="filter-btn" data-filter="noimdb" onclick="setDoubanFilter(this,'noimdb')">无 IMDB ID</button>
+        </div>
+        <span class="count-info" id="doubanCount">-</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>排名</th>
+              <th>电影名称</th>
+              <th>年份</th>
+              <th>IMDB 评分</th>
+              <th>IMDB ID</th>
+              <th>操作</th>
+              <th>状态</th>
+            </tr>
+          </thead>
+          <tbody id="doubanTbody"></tbody>
+        </table>
+      </div>
+      <div class="pagination" id="doubanPagination"></div>
+    </div>
+
+    <!-- IMDB Top 250 -->
+    <div class="page" id="page-imdb">
+      <div class="toolbar">
+        <input type="text" class="search-input" id="imdbSearch" placeholder="🔍 搜索电影名称..." oninput="filterImdb()">
+        <div class="filter-group">
+          <button class="filter-btn active" data-filter="all" onclick="setImdbFilter(this,'all')">全部</button>
+          <button class="filter-btn" data-filter="owned" onclick="setImdbFilter(this,'owned')">已收录</button>
+          <button class="filter-btn" data-filter="missing" onclick="setImdbFilter(this,'missing')">未收录</button>
+        </div>
+        <span class="count-info" id="imdbCount">-</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>排名</th>
+              <th>电影名称</th>
+              <th>年份</th>
+              <th>IMDB 评分</th>
+              <th>投票数</th>
+              <th>IMDB ID</th>
+              <th>分辨率</th>
+              <th>状态</th>
+            </tr>
+          </thead>
+          <tbody id="imdbTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 合集页 -->
+    <div class="page" id="page-collections">
+      <div class="toolbar">
+        <input type="text" class="search-input" id="collectionSearch" placeholder="🔍 搜索合集名称..." oninput="filterCollections()">
+        <div class="filter-group">
+          <button class="filter-btn active" data-filter="all" onclick="setCollectionFilter(this,'all')">全部</button>
+          <button class="filter-btn" data-filter="has_missing" onclick="setCollectionFilter(this,'has_missing')">有未收录</button>
+          <button class="filter-btn" data-filter="complete" onclick="setCollectionFilter(this,'complete')">已全部收录</button>
+        </div>
+        <span class="count-info" id="collectionCountInfo">-</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>合集名称</th>
+              <th>收录状态</th>
+              <th>TMDB ID</th>
+            </tr>
+          </thead>
+          <tbody id="collectionTbody"></tbody>
+        </table>
+      </div>
+      <div class="pagination" id="collectionPagination"></div>
     </div>
   </div>
-  <div class="count" id="imdbCount">加载中...</div>
-  <table>
-    <thead>
-      <tr>
-        <th>#</th>
-        <th>排名</th>
-        <th>电影名称</th>
-        <th>年份</th>
-        <th>IMDB 评分</th>
-        <th>投票数</th>
-        <th>IMDB ID</th>
-        <th>分辨率</th>
-        <th>状态</th>
-      </tr>
-    </thead>
-    <tbody id="imdbTbody"></tbody>
-  </table>
-</div>
-
-<!-- Emby 电影清单 -->
-<div class="panel active" id="panel-2">
-  <div class="toolbar">
-    <div class="search-box">
-      <input type="text" id="searchInput" placeholder="🔍 搜索电影名称或 IMDB ID..." oninput="debounceSearch()">
-    </div>
-    <div class="filters">
-      <label><input type="radio" name="filter250" value="all" onchange="loadMovies(1)" checked> 全部</label>
-      <label><input type="radio" name="filter250" value="imdb" onchange="loadMovies(1)"> 仅 IMDB 250</label>
-      <label><input type="radio" name="filter250" value="douban" onchange="loadMovies(1)"> 仅豆瓣 250</label>
-      <label><input type="radio" name="filter250" value="both" onchange="loadMovies(1)"> 两者都在 250</label>
-    </div>
-  </div>
-  <div class="count" id="embyCount">加载中...</div>
-  <table id="embyTable">
-    <thead>
-      <tr>
-        <th>#</th>
-        <th class="sortable" data-col="title" onclick="changeSort('title')">电影名称 <span class="arrow up">▲</span><span class="arrow down">▼</span></th>
-        <th class="sortable" data-col="year" onclick="changeSort('year')">年份 <span class="arrow up">▲</span><span class="arrow down">▼</span></th>
-        <th class="sortable" data-col="imdb_rating" onclick="changeSort('imdb_rating')">IMDB评分 <span class="arrow up">▲</span><span class="arrow down">▼</span></th>
-        <th>IMDB ID</th>
-        <th>TMDB ID</th>
-        <th>分辨率</th>
-        <th>位置</th>
-        <th class="sortable" data-col="date_added" onclick="changeSort('date_added')">加入日期 <span class="arrow up">▲</span><span class="arrow down">▼</span></th>
-        <th>IMDB 250</th>
-        <th>豆瓣 250</th>
-      </tr>
-    </thead>
-    <tbody id="embyTbody">
-    </tbody>
-  </table>
-  <div class="pagination" id="pagination"></div>
-</div>
-
-<!-- 电影合集 -->
-<div class="panel" id="panel-3">
-  <div class="top250-toolbar">
-    <input type="text" class="top250-search" id="collectionSearch" placeholder="🔍 搜索合集名称..." oninput="filterCollections()">
-    <div class="filters">
-      <label><input type="radio" name="colFilter" value="all" onchange="filterCollections()" checked> 全部</label>
-      <label><input type="radio" name="colFilter" value="has_missing" onchange="filterCollections()"> 有未收录</label>
-      <label><input type="radio" name="colFilter" value="complete" onchange="filterCollections()"> 已全部收录</label>
-    </div>
-  </div>
-  <div class="count" id="collectionCount">加载中...</div>
-  <table>
-    <thead>
-      <tr>
-        <th>#</th>
-        <th>合集名称</th>
-        <th>收录状态</th>
-        <th>TMDB ID</th>
-      </tr>
-    </thead>
-    <tbody id="collectionTbody"></tbody>
-  </table>
-  <div class="pagination" id="collectionPagination"></div>
 </div>
 
 <script>
-// 状态
-let currentPage = 1;
-let sortBy = 'imdb_rating';
-let sortOrder = 'desc';
-let searchTimer = null;
-let doubanMovies = [];
-let imdbMovies = [];
-let collections = [];
-let filteredCollections = [];
-let collectionPage = 1;
-const COLLECTIONS_PER_PAGE = 30;
+// ===== 状态 =====
+var moviePage = 1, movieSort = 'imdb_rating', movieSortDir = 'desc', movieFilter = 'all';
+var movieTimer = null;
+var doubanData = [], imdbData = [], collectionData = [], filteredCollections = [];
+var doubanPage = 1, collectionPage = 1;
+var PER_PAGE = 50, COL_PER_PAGE = 30;
 
-// 主题切换
-function switchTheme(theme) {
-  document.documentElement.setAttribute('data-theme', theme);
-  localStorage.setItem('theme', theme);
+// ===== 主题 =====
+function switchTheme(t) {
+  document.documentElement.setAttribute('data-theme', t);
+  localStorage.setItem('theme', t);
 }
 
-// Tab 切换
-function switchTab(i) {
-  document.querySelectorAll('.tab').forEach((t,j) => t.classList.toggle('active', j===i));
-  document.querySelectorAll('.panel').forEach((p,j) => p.classList.toggle('active', j===i));
-
-  // 懒加载
-  if (i === 0 && doubanMovies.length === 0) loadTop250('douban');
-  if (i === 1 && imdbMovies.length === 0) loadTop250('imdb');
-  if (i === 3 && collections.length === 0) loadCollections();
+// ===== 侧边栏 =====
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
 }
 
-// 防抖搜索
-function debounceSearch() {
-  clearTimeout(searchTimer);
-  searchTimer = setTimeout(() => loadMovies(1), 300);
+// ===== 页面切换 =====
+function switchPage(name) {
+  document.querySelectorAll('.nav-item').forEach(function(n){ n.classList.remove('active'); });
+  document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active'); });
+  event.currentTarget.classList.add('active');
+  document.getElementById('page-' + name).classList.add('active');
+  var titles = {overview:'概览',movies:'电影',douban:'豆瓣 Top 250',imdb:'IMDB Top 250',collections:'合集'};
+  document.getElementById('pageTitle').textContent = titles[name] || name;
+
+  if (name === 'movies') loadMovies(1);
+  if (name === 'douban' && !doubanData.length) loadDouban();
+  if (name === 'imdb' && !imdbData.length) loadImdb();
+  if (name === 'collections' && !collectionData.length) loadCollections();
 }
 
-// 切换排序
-function changeSort(col) {
-  if (sortBy === col) {
-    sortOrder = sortOrder === 'asc' ? 'desc' : 'asc';
-  } else {
-    sortBy = col;
-    sortOrder = 'desc';
-  }
-
-  document.querySelectorAll('#embyTable th.sortable').forEach(th => {
-    th.classList.remove('sorted-asc', 'sorted-desc');
-    if (th.dataset.col === sortBy) {
-      th.classList.add(sortOrder === 'asc' ? 'sorted-asc' : 'sorted-desc');
-    }
-  });
-
-  loadMovies(1);
-}
-
-// 加载电影列表
-function loadMovies(page) {
-  currentPage = page;
-  const search = document.getElementById('searchInput').value;
-  const filter = document.querySelector('input[name="filter250"]:checked').value;
-
-  const params = new URLSearchParams({
-    page: page,
-    per_page: 50,
-    search: search,
-    sort_by: sortBy,
-    sort_order: sortOrder,
-    filter: filter,
-  });
-
-  fetch(`/api/movies?${params}`)
-    .then(r => r.json())
-    .then(data => {
-      renderMovies(data.movies);
-      renderPagination(data.page, data.total_pages, data.total);
-      document.getElementById('embyCount').textContent =
-        `共 ${data.total} 部电影 | 第 ${data.page}/${data.total_pages} 页`;
-    });
-}
-
-// 渲染电影列表
-function renderMovies(movies) {
-  const tbody = document.getElementById('embyTbody');
-  tbody.innerHTML = '';
-  movies.forEach((m, i) => {
-    const tr = document.createElement('tr');
-    tr.className = 'clickable-row';
-    tr.onclick = function() { toggleDetail(this); };
-    tr.innerHTML =
-      '<td>' + ((currentPage - 1) * 50 + i + 1) + '</td>' +
-      '<td>' + m.title + (m.original_title && m.original_title !== m.title ? '<br><span style="color:var(--dim);font-size:12px">' + m.original_title + '</span>' : '') + '</td>' +
-      '<td>' + (m.year || '-') + '</td>' +
-      '<td>' + (m.imdb_rating ? '<span style="color:var(--yellow)">⭐ ' + parseFloat(m.imdb_rating).toFixed(1) + '</span>' + (m.imdb_votes ? '<br><span style="font-size:11px;color:var(--dim)">' + m.imdb_votes.toLocaleString() + '票</span>' : '') : '-') + '</td>' +
-      '<td>' + (m.imdb_id ? '<a href="https://www.imdb.com/title/' + m.imdb_id + '/" target="_blank">' + m.imdb_id + '</a>' : '-') + '</td>' +
-      '<td>' + (m.tmdb_id ? '<a href="https://www.themoviedb.org/movie/' + m.tmdb_id + '" target="_blank">' + m.tmdb_id + '</a>' : '-') + '</td>' +
-      '<td>' + formatResolution(m.resolution_label) + '</td>' +
-      '<td>' + (m.location || '-') + '</td>' +
-      '<td>' + (m.date_added || '-') + '</td>' +
-      '<td>' + (m.in_imdb250 ? '<span class="badge badge-yes">✓ IMDB</span>' : '<span class="badge badge-no">-</span>') + '</td>' +
-      '<td>' + (m.in_douban250 ? '<span class="badge badge-yes">✓ 豆瓣</span>' : '<span class="badge badge-no">-</span>') + '</td>';
-    tbody.appendChild(tr);
-
-    // 添加详情行
-    const detailTr = createDetailRow(11, getMovieDetailHtml(m));
-    tbody.appendChild(detailTr);
-  });
-}
-
-// 格式化分辨率
-function formatResolution(label) {
-  if (label === '4K') return '<span style="color:var(--yellow);font-weight:600">4K</span>';
-  if (label === '1080p') return '<span style="color:var(--green)">1080p</span>';
-  if (label === '720p') return '<span style="color:var(--accent)">720p</span>';
-  return `<span style="color:var(--dim)">${label || '-'}</span>`;
-}
-
-// 渲染分页
-function renderPagination(page, totalPages, total) {
-  const container = document.getElementById('pagination');
-  if (totalPages <= 1) {
-    container.innerHTML = '';
-    return;
-  }
-
-  let html = '';
-  html += `<button ${page <= 1 ? 'disabled' : ''} onclick="loadMovies(${page - 1})">上一页</button>`;
-
-  const start = Math.max(1, page - 2);
-  const end = Math.min(totalPages, page + 2);
-
-  if (start > 1) {
-    html += `<button onclick="loadMovies(1)">1</button>`;
-    if (start > 2) html += '<span class="page-info">...</span>';
-  }
-
-  for (let i = start; i <= end; i++) {
-    html += `<button class="${i === page ? 'active' : ''}" onclick="loadMovies(${i})">${i}</button>`;
-  }
-
-  if (end < totalPages) {
-    if (end < totalPages - 1) html += '<span class="page-info">...</span>';
-    html += `<button onclick="loadMovies(${totalPages})">${totalPages}</button>`;
-  }
-
-  html += `<button ${page >= totalPages ? 'disabled' : ''} onclick="loadMovies(${page + 1})">下一页</button>`;
-
-  container.innerHTML = html;
-}
-
-// ========== Top 250 功能 ==========
-function loadTop250(type) {
-  fetch(`/api/top250?type=${type}`)
-    .then(r => r.json())
-    .then(data => {
-      if (type === 'douban') {
-        doubanMovies = data.movies;
-        renderDoubanTop250(doubanMovies);
-      } else {
-        imdbMovies = data.movies;
-        renderImdbTop250(imdbMovies);
-      }
-    });
-}
-
-function renderDoubanTop250(movies) {
-  const tbody = document.getElementById('doubanTbody');
-  tbody.innerHTML = movies.map((m, i) => {
-    const rowClass = m.in_emby ? '' : 'missing-row';
-    const status = m.in_emby
-      ? '<span class="status-badge status-owned">✓ 已收录</span>'
-      : '<span class="status-badge status-missing">✗ 未收录</span>';
-
-    // 来源标识
-    let sourceHtml = '';
-    if (m.imdb_source === 'manual') {
-      sourceHtml = '<span class="source-badge source-manual">手动</span>';
-    } else if (m.imdb_source === 'auto') {
-      sourceHtml = '<span class="source-badge source-auto">自动</span>';
-    }
-
-    // IMDB ID 显示/编辑
-    let imdbCell = '';
-    if (m.imdb_id) {
-      imdbCell = `<a href="https://www.imdb.com/title/${m.imdb_id}/" target="_blank">${m.imdb_id}</a>${sourceHtml}`;
-    } else {
-      imdbCell = '<span style="color:var(--dim)">-</span>';
-    }
-
-    // 操作按钮
-    let actionCell = '';
-    if (m.imdb_id && m.imdb_source === 'manual') {
-      actionCell = `<button class="edit-btn delete" onclick="deleteMapping('${m.douban_id}')" title="删除关联">🗑️</button>`;
-    } else {
-      actionCell = `<button class="edit-btn" onclick="showEditInput(this, '${m.douban_id}', '${m.title.replace(/'/g, "\\'")}')" title="关联 IMDB ID">✏️</button>`;
-    }
-
-    return `<tr class="${rowClass}" data-title="${m.title.toLowerCase()}" data-owned="${m.in_emby}" data-imdb-source="${m.imdb_source || 'none'}">
-      <td>${i + 1}</td>
-      <td>${m.ranking}</td>
-      <td><a href="${m.douban_link}" target="_blank">${m.title}</a></td>
-      <td>${m.year || '-'}</td>
-      <td>${m.imdb_rating ? `⭐ ${m.imdb_rating}` : '-'}</td>
-      <td>${imdbCell}</td>
-      <td>${actionCell}</td>
-      <td>${status}</td>
-    </tr>`;
-  }).join('');
-
-  updateTop250Count('douban', movies);
-}
-
-function renderImdbTop250(movies) {
-  const tbody = document.getElementById('imdbTbody');
-  tbody.innerHTML = movies.map((m, i) => {
-    const rowClass = m.in_emby ? '' : 'missing-row';
-    const status = m.in_emby
-      ? '<span class="status-badge status-owned">✓ 已收录</span>'
-      : '<span class="status-badge status-missing">✗ 未收录</span>';
-
-    return `<tr class="${rowClass}" data-title="${m.title.toLowerCase()}" data-owned="${m.in_emby}">
-      <td>${m.rank || i + 1}</td>
-      <td>${m.rank || i + 1}</td>
-      <td><a href="https://www.imdb.com/title/${m.imdb_id}/" target="_blank">${m.title}</a></td>
-      <td>${m.year || '-'}</td>
-      <td>${m.rating ? `⭐ ${m.rating}` : '-'}</td>
-      <td>${m.votes ? m.votes.toLocaleString() : '-'}</td>
-      <td><a href="https://www.imdb.com/title/${m.imdb_id}/" target="_blank">${m.imdb_id}</a></td>
-      <td>${m.resolution ? formatResolution(m.resolution) : '-'}</td>
-      <td>${status}</td>
-    </tr>`;
-  }).join('');
-
-  updateTop250Count('imdb', movies);
-}
-
-function filterTop250(type) {
-  const search = document.getElementById(type === 'douban' ? 'doubanSearch' : 'imdbSearch').value.toLowerCase();
-  const filter = document.querySelector(`input[name="${type}Filter"]:checked`).value;
-  const movies = type === 'douban' ? doubanMovies : imdbMovies;
-
-  const filtered = movies.filter(m => {
-    const matchSearch = m.title.toLowerCase().includes(search) || (m.imdb_id && m.imdb_id.toLowerCase().includes(search));
-    let matchFilter = true;
-    if (filter === 'owned') matchFilter = m.in_emby;
-    else if (filter === 'missing') matchFilter = !m.in_emby;
-    else if (filter === 'noimdb') matchFilter = !m.imdb_id || m.imdb_source === 'none';
-    return matchSearch && matchFilter;
-  });
-
-  if (type === 'douban') {
-    renderDoubanTop250(filtered);
-  } else {
-    renderImdbTop250(filtered);
-  }
-}
-
-function updateTop250Count(type, movies) {
-  const total = movies.length;
-  const owned = movies.filter(m => m.in_emby).length;
-  const missing = total - owned;
-  const noimdb = movies.filter(m => !m.imdb_id || m.imdb_source === 'none').length;
-  const countEl = document.getElementById(type === 'douban' ? 'doubanCount' : 'imdbCount');
-  if (type === 'douban') {
-    countEl.textContent = `共 ${total} 部电影 | 已收录 ${owned} | 未收录 ${missing} | 无 IMDB ID ${noimdb}`;
-  } else {
-    countEl.textContent = `共 ${total} 部电影 | 已收录 ${owned} | 未收录 ${missing}`;
-  }
-}
-
-// ========== 映射管理功能 ==========
-
-function showEditInput(btn, doubanId, title) {
-  document.querySelectorAll('.edit-input-row').forEach(el => el.remove());
-  const tr = btn.closest('tr');
-  const newRow = document.createElement('tr');
-  newRow.className = 'edit-input-row';
-  newRow.innerHTML = `
-    <td colspan="8" style="padding: 8px 16px; background: var(--card);">
-      <div style="display: flex; align-items: center; gap: 8px;">
-        <span style="color: var(--dim);">为 <strong>${title}</strong> 关联 IMDB ID:</span>
-        <input type="text" class="edit-input" id="editImdbId" placeholder="tt1234567" style="width: 120px;">
-        <input type="text" class="edit-input" id="editNote" placeholder="备注（可选）" style="width: 150px;">
-        <button class="edit-btn" onclick="saveMapping('${doubanId}', '${title.replace(/'/g, "\\'")}')">保存</button>
-        <button class="edit-btn" style="background:var(--dim)" onclick="this.closest('.edit-input-row').remove()">取消</button>
-      </div>
-    </td>
-  `;
-  tr.after(newRow);
-  document.getElementById('editImdbId').focus();
-}
-
-function saveMapping(doubanId, title) {
-  const imdbId = document.getElementById('editImdbId').value.trim();
-  const note = document.getElementById('editNote').value.trim();
-  if (!imdbId) { alert('请输入 IMDB ID'); return; }
-  if (!imdbId.startsWith('tt')) { alert('IMDB ID 格式错误，应以 tt 开头'); return; }
-
-  fetch('/api/mapping', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ douban_id: doubanId, title, imdb_id: imdbId, note })
-  })
-    .then(r => r.json())
-    .then(data => {
-      if (data.status === 'ok') {
-        loadTop250('douban');
-      } else {
-        alert(data.message || '保存失败');
-      }
-    })
-    .catch(err => alert('请求失败: ' + err));
-}
-
-function deleteMapping(doubanId) {
-  if (!confirm('确定删除此关联？')) return;
-  fetch(`/api/mapping/${doubanId}`, { method: 'DELETE' })
-    .then(r => r.json())
-    .then(data => {
-      if (data.status === 'ok') {
-        loadTop250('douban');
-      } else {
-        alert(data.message || '删除失败');
-      }
-    })
-    .catch(err => alert('请求失败: ' + err));
-}
-
-// ========== 更新功能 ==========
-const LABELS = {'emby': 'Emby清单', 'imdb': 'IMDB 250', 'douban': '豆瓣250', 'collections': '电影合集'};
-
-function triggerUpdate(type) {
-  const btn = document.getElementById('btn-' + type);
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span> 执行中...';
-  showStatus('running', '正在更新' + LABELS[type] + '...');
-
-  fetch('/api/update/' + type, {'method': 'POST'})
-    .then(r => r.json())
-    .then(data => {
-      if (data.status === 'busy') {
-        showStatus('running', '任务正在执行中，请稍候...');
-      }
-      pollStatus(type);
-    })
-    .catch(err => {
-      btn.disabled = false;
-      btn.innerHTML = '🔄 更新' + LABELS[type];
-      showStatus('error', '请求失败: ' + err);
-    });
-}
-
-function pollStatus(type) {
-  const btn = document.getElementById('btn-' + type);
-
-  const timer = setInterval(() => {
-    fetch('/api/status').then(r => r.json()).then(status => {
-      const s = status[type];
-      if (!s) return;
-
-      if (s.status === 'done') {
-        clearInterval(timer);
-        btn.disabled = false;
-        btn.innerHTML = '🔄 更新' + LABELS[type];
-        showStatus('done', s.message);
-        setTimeout(() => location.reload(), 1500);
-      } else if (s.status === 'error') {
-        clearInterval(timer);
-        btn.disabled = false;
-        btn.innerHTML = '🔄 更新' + LABELS[type];
-        showStatus('error', s.message);
-      } else {
-        showStatus('running', s.message);
-      }
-    });
-  }, 2000);
-}
-
-function showStatus(type, msg) {
-  const bar = document.getElementById('statusBar');
-  bar.innerHTML = `<span class="status-msg status-${type}">${msg}</span>`;
-}
-
-// ========== 电影详情展开功能 ==========
+// ===== 通用详情展开 =====
 function toggleDetail(row) {
-  const nextRow = row.nextElementSibling;
-  if (nextRow && nextRow.classList.contains('detail-row')) {
-    nextRow.classList.toggle('active');
+  var next = row.nextElementSibling;
+  if (next && next.classList.contains('detail-row')) {
+    next.classList.toggle('active');
     row.classList.toggle('expanded');
   }
 }
-
-function createDetailRow(colCount, html) {
-  const tr = document.createElement('tr');
+function makeDetailRow(cols, html) {
+  var tr = document.createElement('tr');
   tr.className = 'detail-row';
-  tr.innerHTML = '<td colspan="' + colCount + '" class="detail-cell">' + html + '</td>';
+  tr.innerHTML = '<td colspan="' + cols + '" class="detail-cell">' + html + '</td>';
   return tr;
 }
-
-function getMovieDetailHtml(m) {
-  var actorsText = m.actors || '-';
-  var actorsHtml = actorsText.length > 40
-    ? '<span title="' + actorsText.replace(/"/g, '&quot;') + '">' + actorsText.substring(0, 40) + '...</span>'
-    : actorsText;
-
-  return '<div class="detail-content">' +
-    '<div class="detail-item" style="grid-column: 1 / -1"><span class="detail-label">简介</span><span class="detail-value">' + (m.overview || '-') + '</span></div>' +
-    '<div class="detail-item"><span class="detail-label">导演</span><span class="detail-value">' + (m.directors || '-') + '</span></div>' +
-    '<div class="detail-item"><span class="detail-label">演员</span><span class="detail-value">' + actorsHtml + '</span></div>' +
-    '<div class="detail-item"><span class="detail-label">Emby 评分</span><span class="detail-value">' + (m.rating ? '⭐ ' + parseFloat(m.rating).toFixed(1) : '-') + '</span></div>' +
-    '<div class="detail-item"><span class="detail-label">类型</span><span class="detail-value">' + (m.genres || '-') + '</span></div>' +
-    '<div class="detail-item"><span class="detail-label">制片厂</span><span class="detail-value">' + (m.studios || '-') + '</span></div>' +
-    '<div class="detail-item"><span class="detail-label">文件大小</span><span class="detail-value">' + (m.size ? (m.size / 1073741824).toFixed(1) + ' GB' : '-') + '</span></div>' +
-    '<div class="detail-item"><span class="detail-label">编码</span><span class="detail-value">' + (m.video_codec || '-') + ' / ' + (m.audio_codec || '-') + '</span></div>' +
+function detailHtml(m) {
+  var actors = m.actors || '-';
+  var actorsShort = actors.length > 40 ? '<span title="' + actors.replace(/"/g,'&quot;') + '">' + actors.substring(0,40) + '...</span>' : actors;
+  return '<div class="detail-grid">' +
+    '<div class="detail-item" style="grid-column:1/-1"><span class="detail-label">简介</span><span class="detail-value">' + (m.overview||'-') + '</span></div>' +
+    '<div class="detail-item"><span class="detail-label">导演</span><span class="detail-value">' + (m.directors||'-') + '</span></div>' +
+    '<div class="detail-item"><span class="detail-label">演员</span><span class="detail-value">' + actorsShort + '</span></div>' +
+    '<div class="detail-item"><span class="detail-label">Emby 评分</span><span class="detail-value">' + (m.rating ? '⭐ '+parseFloat(m.rating).toFixed(1) : '-') + '</span></div>' +
+    '<div class="detail-item"><span class="detail-label">类型</span><span class="detail-value">' + (m.genres||'-') + '</span></div>' +
+    '<div class="detail-item"><span class="detail-label">制片厂</span><span class="detail-value">' + (m.studios||'-') + '</span></div>' +
+    '<div class="detail-item"><span class="detail-label">文件大小</span><span class="detail-value">' + (m.size ? (m.size/1073741824).toFixed(1)+' GB' : '-') + '</span></div>' +
+    '<div class="detail-item"><span class="detail-label">编码</span><span class="detail-value">' + (m.video_codec||'-') + ' / ' + (m.audio_codec||'-') + '</span></div>' +
     '</div>';
 }
-
-// ========== 合集功能 ==========
-function loadCollections() {
-  document.getElementById('collectionCount').textContent = '加载中...';
-
-  fetch('/api/collections')
-    .then(r => r.json())
-    .then(data => {
-      if (data.error) {
-        document.getElementById('collectionTbody').innerHTML = '<tr><td colspan="4" style="color:var(--red)">' + data.error + '</td></tr>';
-        return;
-      }
-      collections = data.collections;
-      filteredCollections = collections;
-      collectionPage = 1;
-      renderCollectionsPage();
-    })
-    .catch(err => {
-      document.getElementById('collectionTbody').innerHTML = '<tr><td colspan="4" style="color:var(--red)">加载失败: ' + err + '</td></tr>';
-    });
+function fmtRes(label) {
+  if (label==='4K') return '<span style="color:var(--yellow);font-weight:600">4K</span>';
+  if (label==='1080p') return '<span style="color:var(--green)">1080p</span>';
+  if (label==='720p') return '<span style="color:var(--accent)">720p</span>';
+  return '<span style="color:var(--dim)">' + (label||'-') + '</span>';
+}
+function fmtRating(v, votes) {
+  if (!v) return '-';
+  var s = '<span style="color:var(--yellow)">⭐ ' + parseFloat(v).toFixed(1) + '</span>';
+  if (votes) s += '<br><span style="font-size:10px;color:var(--dim)">' + votes.toLocaleString() + '票</span>';
+  return s;
 }
 
-function renderCollections(list) {
-  const tbody = document.getElementById('collectionTbody');
-  tbody.innerHTML = list.map((c, i) => {
-    var total = c.total_count || 0;
-    var missing = c.missing_count || 0;
-    var owned = total - missing;
-    var statusHtml = '';
-    if (total > 0) {
-      if (missing === 0) {
-        statusHtml = '<span style="color:var(--green)">✓ 全部收录 (' + owned + ')</span>';
-      } else {
-        statusHtml = '<span style="color:var(--green)">' + owned + ' 已收录</span> / <span style="color:var(--red)">' + missing + ' 未收录</span>';
-      }
-    } else {
-      statusHtml = '-';
-    }
-
-    return '<tr class="clickable-row" onclick="toggleCollection(' + c.id + ')">' +
-      '<td>' + (i + 1) + '</td>' +
-      '<td>📁 ' + c.name + '</td>' +
-      '<td>' + statusHtml + '</td>' +
-      '<td>' + (c.tmdb_id ? '<a href="https://www.themoviedb.org/collection/' + c.tmdb_id + '" target="_blank">' + c.tmdb_id + '</a>' : '-') + '</td>' +
-      '</tr>' +
-      '<tr class="detail-row" id="col-' + c.id + '">' +
-      '<td colspan="4" class="detail-cell"><div class="collection-loading">加载中...</div></td>' +
-      '</tr>';
-  }).join('');
+// ===== 电影页 =====
+function debounceMovieSearch() { clearTimeout(movieTimer); movieTimer = setTimeout(function(){ loadMovies(1); }, 300); }
+function setMovieFilter(btn, f) {
+  btn.parentElement.querySelectorAll('.filter-btn').forEach(function(b){ b.classList.remove('active'); });
+  btn.classList.add('active');
+  movieFilter = f;
+  loadMovies(1);
 }
-
-function toggleCollection(id) {
-  const detailRow = document.getElementById(`col-${id}`);
-  if (detailRow.classList.contains('active')) {
-    detailRow.classList.remove('active');
-    return;
-  }
-
-  detailRow.classList.add('active');
-  const cell = detailRow.querySelector('.detail-cell');
-
-  fetch(`/api/collections/${id}`)
-    .then(r => r.json())
-    .then(data => {
-      if (data.error) {
-        cell.innerHTML = '<div style="color:var(--red)">' + data.error + '</div>';
-      } else {
-        let html = '';
-
-        // 已收录电影
-        if (data.movies.length > 0) {
-          html += '<div style="margin-bottom:12px;font-size:13px;color:var(--dim)">已收录 (' + data.movies.length + ')</div>';
-          html += '<table style="width:100%;margin:0;"><thead><tr><th>#</th><th>电影名称</th><th>年份</th><th>IMDB评分</th><th>IMDB ID</th><th>TMDB ID</th><th>分辨率</th></tr></thead><tbody>';
-          data.movies.forEach((m, i) => {
-            var detailHtml = getMovieDetailHtml(m);
-            html += '<tr class="clickable-row" onclick="toggleDetail(this)">' +
-              '<td>' + (i + 1) + '</td>' +
-              '<td>' + m.name + (m.original_title && m.original_title !== m.name ? '<br><span style="color:var(--dim);font-size:12px">' + m.original_title + '</span>' : '') + '</td>' +
-              '<td>' + (m.year || '-') + '</td>' +
-              '<td>' + (m.imdb_rating ? '<span style="color:var(--yellow)">⭐ ' + parseFloat(m.imdb_rating).toFixed(1) + '</span>' + (m.imdb_votes ? '<br><span style="font-size:11px;color:var(--dim)">' + m.imdb_votes.toLocaleString() + '票</span>' : '') : '-') + '</td>' +
-              '<td>' + (m.imdb_id ? '<a href="https://www.imdb.com/title/' + m.imdb_id + '/" target="_blank">' + m.imdb_id + '</a>' : '-') + '</td>' +
-              '<td>' + (m.tmdb_id ? '<a href="https://www.themoviedb.org/movie/' + m.tmdb_id + '" target="_blank">' + m.tmdb_id + '</a>' : '-') + '</td>' +
-              '<td>' + formatResolution(m.resolution_label) + '</td>' +
-              '</tr>';
-            html += '<tr class="detail-row"><td colspan="7" class="detail-cell">' + detailHtml + '</td></tr>';
-          });
-          html += '</tbody></table>';
-        }
-
-        // 未收录电影
-        if (data.missing && data.missing.length > 0) {
-          html += '<div style="margin-top:16px;margin-bottom:12px;font-size:13px;color:var(--red)">未收录 (' + data.missing.length + ')</div>';
-          html += '<table style="width:100%;margin:0;"><thead><tr><th>#</th><th>电影名称</th><th>年份</th><th>评分</th><th>TMDB ID</th></tr></thead><tbody>';
-          data.missing.forEach((m, i) => {
-            html += '<tr style="opacity:0.6">' +
-              '<td>' + (i + 1) + '</td>' +
-              '<td>' + m.name + (m.original_title && m.original_title !== m.name ? '<br><span style="color:var(--dim);font-size:12px">' + m.original_title + '</span>' : '') + '</td>' +
-              '<td>' + (m.year || '-') + '</td>' +
-              '<td>' + (m.rating ? '⭐ ' + parseFloat(m.rating).toFixed(1) : '-') + '</td>' +
-              '<td><a href="https://www.themoviedb.org/movie/' + m.tmdb_id + '" target="_blank">' + m.tmdb_id + '</a></td>' +
-              '</tr>';
-          });
-          html += '</tbody></table>';
-        }
-
-        cell.innerHTML = html || '<div style="color:var(--dim)">无数据</div>';
-      }
-    })
-    .catch(err => {
-      cell.innerHTML = '<div style="color:var(--red)">加载失败: ' + err + '</div>';
-    });
+function changeMovieSort(col) {
+  if (movieSort === col) movieSortDir = movieSortDir === 'asc' ? 'desc' : 'asc';
+  else { movieSort = col; movieSortDir = 'desc'; }
+  document.querySelectorAll('#page-movies th.sortable').forEach(function(t){ t.classList.remove('sorted-asc','sorted-desc'); });
+  var th = document.querySelector('#page-movies th[data-col="'+col+'"]');
+  if (th) th.classList.add(movieSortDir === 'asc' ? 'sorted-asc' : 'sorted-desc');
+  loadMovies(1);
 }
-
-function filterCollections() {
-  const search = document.getElementById('collectionSearch').value.toLowerCase();
-  const filter = document.querySelector('input[name="colFilter"]:checked').value;
-
-  filteredCollections = collections.filter(c => {
-    const matchSearch = c.name.toLowerCase().includes(search);
-    let matchFilter = true;
-    if (filter === 'has_missing') matchFilter = c.missing_count > 0;
-    else if (filter === 'complete') matchFilter = c.missing_count === 0 && c.total_count > 0;
-    return matchSearch && matchFilter;
+function loadMovies(page) {
+  moviePage = page;
+  var p = new URLSearchParams({page:page,per_page:PER_PAGE,search:document.getElementById('movieSearch').value,sort_by:movieSort,sort_order:movieSortDir,filter:movieFilter});
+  fetch('/api/movies?'+p).then(function(r){return r.json();}).then(function(d){
+    renderMovies(d.movies);
+    renderPag('moviePagination',d.page,d.total_pages,function(p){loadMovies(p);});
+    document.getElementById('movieCount').textContent = '共 '+d.total+' 部 | 第 '+d.page+'/'+d.total_pages+' 页';
   });
+}
+function renderMovies(movies) {
+  var tbody = document.getElementById('movieTbody');
+  tbody.innerHTML = '';
+  movies.forEach(function(m,i){
+    var tr = document.createElement('tr');
+    tr.className = 'clickable-row';
+    tr.onclick = function(){ toggleDetail(this); };
+    tr.innerHTML =
+      '<td>'+((moviePage-1)*PER_PAGE+i+1)+'</td>'+
+      '<td>'+m.title+(m.original_title&&m.original_title!==m.title?'<br><span style="color:var(--dim);font-size:11px">'+m.original_title+'</span>':'')+'</td>'+
+      '<td>'+(m.year||'-')+'</td>'+
+      '<td>'+fmtRating(m.imdb_rating,m.imdb_votes)+'</td>'+
+      '<td>'+(m.imdb_id?'<a href="https://www.imdb.com/title/'+m.imdb_id+'/" target="_blank">'+m.imdb_id+'</a>':'-')+'</td>'+
+      '<td>'+(m.tmdb_id?'<a href="https://www.themoviedb.org/movie/'+m.tmdb_id+'" target="_blank">'+m.tmdb_id+'</a>':'-')+'</td>'+
+      '<td>'+fmtRes(m.resolution_label)+'</td>'+
+      '<td>'+(m.location||'-')+'</td>'+
+      '<td>'+(m.date_added||'-')+'</td>'+
+      '<td>'+(m.in_imdb250?'<span class="badge badge-green">✓</span>':'<span style="color:var(--dim)">-</span>')+'</td>'+
+      '<td>'+(m.in_douban250?'<span class="badge badge-green">✓</span>':'<span style="color:var(--dim)">-</span>')+'</td>';
+    tbody.appendChild(tr);
+    tbody.appendChild(makeDetailRow(11, detailHtml(m)));
+  });
+}
 
+// ===== 豆瓣 Top 250 =====
+var doubanFilterVal = 'all';
+function loadDouban() {
+  fetch('/api/top250?type=douban').then(function(r){return r.json();}).then(function(d){
+    doubanData = d.movies;
+    doubanPage = 1;
+    renderDouban();
+  });
+}
+function setDoubanFilter(btn, f) {
+  btn.parentElement.querySelectorAll('.filter-btn').forEach(function(b){ b.classList.remove('active'); });
+  btn.classList.add('active');
+  doubanFilterVal = f;
+  doubanPage = 1;
+  renderDouban();
+}
+function filterDouban() { doubanPage = 1; renderDouban(); }
+function renderDouban() {
+  var search = document.getElementById('doubanSearch').value.toLowerCase();
+  var filtered = doubanData.filter(function(m){
+    var ms = m.title.toLowerCase().includes(search) || (m.imdb_id && m.imdb_id.toLowerCase().includes(search));
+    var mf = doubanFilterVal==='all' || (doubanFilterVal==='owned'&&m.in_emby) || (doubanFilterVal==='missing'&&!m.in_emby) || (doubanFilterVal==='noimdb'&&!m.imdb_id);
+    return ms && mf;
+  });
+  var total = filtered.length;
+  var start = (doubanPage-1)*PER_PAGE;
+  var page = filtered.slice(start, start+PER_PAGE);
+  var tbody = document.getElementById('doubanTbody');
+  tbody.innerHTML = '';
+  page.forEach(function(m,i){
+    var src = m.imdb_source==='manual'?'<span class="badge badge-yellow">手动</span>':m.imdb_source==='auto'?'<span class="badge badge-green">自动</span>':'';
+    var imdb = m.imdb_id?'<a href="https://www.imdb.com/title/'+m.imdb_id+'/" target="_blank">'+m.imdb_id+'</a>'+src:'<span style="color:var(--dim)">-</span>';
+    var act = m.imdb_id&&m.imdb_source==='manual'?'<button class="btn btn-ghost" style="padding:3px 8px;font-size:11px" onclick="event.stopPropagation();deleteMapping(\''+m.douban_id+'\')">🗑️</button>':'<button class="btn btn-ghost" style="padding:3px 8px;font-size:11px" onclick="event.stopPropagation();showEdit(this,\''+m.douban_id+'\',\''+m.title.replace(/'/g,"\\'")+'\')">✏️</button>';
+    var cls = m.in_emby?'':' style="opacity:.5"';
+    var tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td'+cls+'>'+(start+i+1)+'</td>'+
+      '<td'+cls+'>'+m.ranking+'</td>'+
+      '<td'+cls+'><a href="'+m.douban_link+'" target="_blank">'+m.title+'</a></td>'+
+      '<td'+cls+'>'+(m.year||'-')+'</td>'+
+      '<td'+cls+'>'+(m.imdb_rating?'⭐ '+parseFloat(m.imdb_rating).toFixed(1):'-')+'</td>'+
+      '<td'+cls+'>'+imdb+'</td>'+
+      '<td'+cls+'>'+act+'</td>'+
+      '<td'+cls+'>'+(m.in_emby?'<span class="badge badge-green">✓ 已收录</span>':'<span class="badge badge-red">✗ 未收录</span>')+'</td>';
+    tbody.appendChild(tr);
+  });
+  var totalPages = Math.ceil(total/PER_PAGE);
+  document.getElementById('doubanCount').textContent = '共 '+total+' 部 | 第 '+doubanPage+'/'+totalPages+' 页';
+  renderPag('doubanPagination',doubanPage,totalPages,function(p){doubanPage=p;renderDouban();});
+}
+function showEdit(btn, did, title) {
+  var tr = btn.closest('tr');
+  if (tr.nextElementSibling && tr.nextElementSibling.classList.contains('detail-row')) { tr.nextElementSibling.remove(); return; }
+  var row = makeDetailRow(8,'<div style="display:flex;align-items:center;gap:8px"><span style="color:var(--dim)">为 <strong>'+title+'</strong> 关联 IMDB ID:</span><input type="text" class="search-input" id="editImdbId" placeholder="tt1234567" style="width:120px"><input type="text" class="search-input" id="editNote" placeholder="备注" style="width:140px"><button class="btn btn-primary" onclick="saveMapping(\''+did+'\',\''+title.replace(/'/g,"\\'")+'\')">保存</button></div>');
+  tr.after(row);
+  document.getElementById('editImdbId').focus();
+}
+function saveMapping(did, title) {
+  var imdb = document.getElementById('editImdbId').value.trim();
+  var note = document.getElementById('editNote').value.trim();
+  if (!imdb||!imdb.startsWith('tt')) { alert('IMDB ID 格式错误'); return; }
+  fetch('/api/mapping',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({douban_id:did,title:title,imdb_id:imdb,note:note})}).then(function(r){return r.json();}).then(function(d){
+    if(d.status==='ok') loadDouban(); else alert(d.message);
+  });
+}
+function deleteMapping(did) {
+  if(!confirm('确定删除？')) return;
+  fetch('/api/mapping/'+did,{method:'DELETE'}).then(function(r){return r.json();}).then(function(d){
+    if(d.status==='ok') loadDouban(); else alert(d.message);
+  });
+}
+
+// ===== IMDB Top 250 =====
+var imdbFilterVal = 'all';
+function loadImdb() {
+  fetch('/api/top250?type=imdb').then(function(r){return r.json();}).then(function(d){
+    imdbData = d.movies;
+    renderImdb();
+  });
+}
+function setImdbFilter(btn, f) {
+  btn.parentElement.querySelectorAll('.filter-btn').forEach(function(b){ b.classList.remove('active'); });
+  btn.classList.add('active');
+  imdbFilterVal = f;
+  renderImdb();
+}
+function filterImdb() { renderImdb(); }
+function renderImdb() {
+  var search = document.getElementById('imdbSearch').value.toLowerCase();
+  var filtered = imdbData.filter(function(m){
+    var ms = m.title.toLowerCase().includes(search) || (m.imdb_id&&m.imdb_id.toLowerCase().includes(search));
+    var mf = imdbFilterVal==='all' || (imdbFilterVal==='owned'&&m.in_emby) || (imdbFilterVal==='missing'&&!m.in_emby);
+    return ms && mf;
+  });
+  var tbody = document.getElementById('imdbTbody');
+  tbody.innerHTML = '';
+  filtered.forEach(function(m,i){
+    var cls = m.in_emby?'':' style="opacity:.5"';
+    var tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td'+cls+'>'+(i+1)+'</td>'+
+      '<td'+cls+'>'+(m.rank||i+1)+'</td>'+
+      '<td'+cls+'><a href="https://www.imdb.com/title/'+m.imdb_id+'/" target="_blank">'+m.title+'</a></td>'+
+      '<td'+cls+'>'+(m.year||'-')+'</td>'+
+      '<td'+cls+'>'+(m.rating?'⭐ '+parseFloat(m.rating).toFixed(1):'-')+'</td>'+
+      '<td'+cls+'>'+(m.votes?m.votes.toLocaleString():'-')+'</td>'+
+      '<td'+cls+'><a href="https://www.imdb.com/title/'+m.imdb_id+'/" target="_blank">'+m.imdb_id+'</a></td>'+
+      '<td'+cls+'>'+fmtRes(m.resolution)+'</td>'+
+      '<td'+cls+'>'+(m.in_emby?'<span class="badge badge-green">✓ 已收录</span>':'<span class="badge badge-red">✗ 未收录</span>')+'</td>';
+    tbody.appendChild(tr);
+  });
+  document.getElementById('imdbCount').textContent = '共 '+filtered.length+' 部';
+}
+
+// ===== 合集 =====
+var collectionFilterVal = 'all';
+function loadCollections() {
+  fetch('/api/collections').then(function(r){return r.json();}).then(function(d){
+    collectionData = d.collections;
+    filteredCollections = collectionData;
+    collectionPage = 1;
+    renderCollectionsPage();
+    document.getElementById('collectionCount').textContent = d.total;
+  });
+}
+function setCollectionFilter(btn, f) {
+  btn.parentElement.querySelectorAll('.filter-btn').forEach(function(b){ b.classList.remove('active'); });
+  btn.classList.add('active');
+  collectionFilterVal = f;
+  filterCollections();
+}
+function filterCollections() {
+  var search = document.getElementById('collectionSearch').value.toLowerCase();
+  filteredCollections = collectionData.filter(function(c){
+    var ms = c.name.toLowerCase().includes(search);
+    var mf = collectionFilterVal==='all' || (collectionFilterVal==='has_missing'&&c.missing_count>0) || (collectionFilterVal==='complete'&&c.missing_count===0&&c.total_count>0);
+    return ms && mf;
+  });
   collectionPage = 1;
   renderCollectionsPage();
 }
-
 function renderCollectionsPage() {
-  const totalPages = Math.ceil(filteredCollections.length / COLLECTIONS_PER_PAGE);
-  const start = (collectionPage - 1) * COLLECTIONS_PER_PAGE;
-  const end = start + COLLECTIONS_PER_PAGE;
-  const pageData = filteredCollections.slice(start, end);
-
-  renderCollections(pageData);
-  renderCollectionPagination(totalPages);
-
-  document.getElementById('collectionCount').textContent =
-    '显示 ' + filteredCollections.length + ' / ' + collections.length + ' 个合集 | 第 ' + collectionPage + '/' + totalPages + ' 页';
+  var total = filteredCollections.length;
+  var totalPages = Math.ceil(total/COL_PER_PAGE);
+  var start = (collectionPage-1)*COL_PER_PAGE;
+  var page = filteredCollections.slice(start, start+COL_PER_PAGE);
+  var tbody = document.getElementById('collectionTbody');
+  tbody.innerHTML = '';
+  page.forEach(function(c,i){
+    var owned = (c.total_count||0) - (c.missing_count||0);
+    var status = c.total_count>0?(c.missing_count===0?'<span class="badge badge-green">✓ 全部收录 ('+owned+')</span>':'<span style="color:var(--green)">'+owned+'</span> / <span style="color:var(--red)">'+c.missing_count+' 未收录</span>'):'-';
+    var tr = document.createElement('tr');
+    tr.className = 'clickable-row';
+    tr.onclick = function(){ toggleCollection(c.id, this); };
+    tr.innerHTML =
+      '<td>'+(start+i+1)+'</td>'+
+      '<td>📁 '+c.name+'</td>'+
+      '<td>'+status+'</td>'+
+      '<td>'+(c.tmdb_id?'<a href="https://www.themoviedb.org/collection/'+c.tmdb_id+'" target="_blank">'+c.tmdb_id+'</a>':'-')+'</td>';
+    tbody.appendChild(tr);
+    tbody.appendChild(makeDetailRow(4, '<div class="loading" style="color:var(--dim)">点击展开查看详情</div>'));
+  });
+  document.getElementById('collectionCountInfo').textContent = '显示 '+total+' / '+collectionData.length+' 个合集';
+  renderPag('collectionPagination',collectionPage,totalPages,function(p){collectionPage=p;renderCollectionsPage();});
+}
+function toggleCollection(id, row) {
+  var detail = row.nextElementSibling;
+  if (detail.classList.contains('active')) { detail.classList.toggle('active'); row.classList.toggle('expanded'); return; }
+  detail.classList.add('active');
+  row.classList.add('expanded');
+  var cell = detail.querySelector('.detail-cell');
+  cell.innerHTML = '<div style="color:var(--dim)">加载中...</div>';
+  fetch('/api/collections/'+id).then(function(r){return r.json();}).then(function(d){
+    var html = '';
+    if (d.movies.length) {
+      html += '<div style="margin-bottom:8px;font-size:12px;color:var(--dim)">已收录 ('+d.movies.length+')</div>';
+      html += '<table style="width:100%;margin:0"><thead><tr><th>#</th><th>电影</th><th>年份</th><th>IMDB评分</th><th>IMDB ID</th><th>TMDB ID</th><th>分辨率</th></tr></thead><tbody>';
+      d.movies.forEach(function(m,i){
+        html += '<tr class="clickable-row" onclick="toggleDetail(this)">'+
+          '<td>'+(i+1)+'</td>'+
+          '<td>'+m.name+(m.original_title&&m.original_title!==m.name?'<br><span style="color:var(--dim);font-size:11px">'+m.original_title+'</span>':'')+'</td>'+
+          '<td>'+(m.year||'-')+'</td>'+
+          '<td>'+fmtRating(m.imdb_rating,m.imdb_votes)+'</td>'+
+          '<td>'+(m.imdb_id?'<a href="https://www.imdb.com/title/'+m.imdb_id+'/" target="_blank">'+m.imdb_id+'</a>':'-')+'</td>'+
+          '<td>'+(m.tmdb_id?'<a href="https://www.themoviedb.org/movie/'+m.tmdb_id+'" target="_blank">'+m.tmdb_id+'</a>':'-')+'</td>'+
+          '<td>'+fmtRes(m.resolution_label)+'</td></tr>';
+        html += '<tr class="detail-row"><td colspan="7" class="detail-cell">'+detailHtml(m)+'</td></tr>';
+      });
+      html += '</tbody></table>';
+    }
+    if (d.missing.length) {
+      html += '<div style="margin-top:12px;margin-bottom:8px;font-size:12px;color:var(--red)">未收录 ('+d.missing.length+')</div>';
+      html += '<table style="width:100%;margin:0"><thead><tr><th>#</th><th>电影</th><th>年份</th><th>评分</th><th>TMDB ID</th></tr></thead><tbody>';
+      d.missing.forEach(function(m,i){
+        html += '<tr style="opacity:.5"><td>'+(i+1)+'</td><td>'+m.name+'</td><td>'+(m.year||'-')+'</td><td>'+(m.rating?'⭐ '+parseFloat(m.rating).toFixed(1):'-')+'</td><td><a href="https://www.themoviedb.org/movie/'+m.tmdb_id+'" target="_blank">'+m.tmdb_id+'</a></td></tr>';
+      });
+      html += '</tbody></table>';
+    }
+    cell.innerHTML = html || '<div style="color:var(--dim)">无数据</div>';
+  });
 }
 
-function renderCollectionPagination(totalPages) {
-  const container = document.getElementById('collectionPagination');
-  if (totalPages <= 1) {
-    container.innerHTML = '';
-    return;
-  }
-
-  let html = '';
-  html += '<button ' + (collectionPage <= 1 ? 'disabled' : '') + ' onclick="goCollectionPage(' + (collectionPage - 1) + ')">上一页</button>';
-
-  const start = Math.max(1, collectionPage - 2);
-  const end = Math.min(totalPages, collectionPage + 2);
-
-  if (start > 1) {
-    html += '<button onclick="goCollectionPage(1)">1</button>';
-    if (start > 2) html += '<span class="page-info">...</span>';
-  }
-
-  for (let i = start; i <= end; i++) {
-    html += '<button class="' + (i === collectionPage ? 'active' : '') + '" onclick="goCollectionPage(' + i + ')">' + i + '</button>';
-  }
-
-  if (end < totalPages) {
-    if (end < totalPages - 1) html += '<span class="page-info">...</span>';
-    html += '<button onclick="goCollectionPage(' + totalPages + ')">' + totalPages + '</button>';
-  }
-
-  html += '<button ' + (collectionPage >= totalPages ? 'disabled' : '') + ' onclick="goCollectionPage(' + (collectionPage + 1) + ')">下一页</button>';
-
-  container.innerHTML = html;
+// ===== 分页 =====
+function renderPag(id, page, total, cb) {
+  var el = document.getElementById(id);
+  if (total<=1) { el.innerHTML=''; return; }
+  var h = '<button '+(page<=1?'disabled':'')+' onclick="void(0)" data-p="'+(page-1)+'">上一页</button>';
+  var s = Math.max(1,page-2), e = Math.min(total,page+2);
+  if (s>1) { h+='<button onclick="void(0)" data-p="1">1</button>'; if(s>2) h+='<span class="info">...</span>'; }
+  for(var i=s;i<=e;i++) h+='<button class="'+(i===page?'active':'')+'" onclick="void(0)" data-p="'+i+'">'+i+'</button>';
+  if (e<total) { if(e<total-1) h+='<span class="info">...</span>'; h+='<button onclick="void(0)" data-p="'+total+'">'+total+'</button>'; }
+  h += '<button '+(page>=total?'disabled':'')+' onclick="void(0)" data-p="'+(page+1)+'">下一页</button>';
+  el.innerHTML = h;
+  el.querySelectorAll('button[data-p]').forEach(function(b){
+    b.addEventListener('click', function(){ var p=parseInt(this.dataset.p); if(p>0&&p<=total) cb(p); });
+  });
 }
 
-function goCollectionPage(page) {
-  collectionPage = page;
-  renderCollectionsPage();
+// ===== 更新功能 =====
+var LABELS = {emby:'Emby清单',imdb:'IMDB 250',douban:'豆瓣250',collections:'合集'};
+function triggerUpdate(type) {
+  var btn = document.getElementById('btn-'+type);
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+  showStatus('running','更新'+LABELS[type]+'...');
+  fetch('/api/update/'+type,{method:'POST'}).then(function(r){return r.json();}).then(function(d){
+    if(d.status==='busy') showStatus('running','任务执行中...');
+    pollStatus(type);
+  }).catch(function(e){ btn.disabled=false; btn.innerHTML='🔄 '+LABELS[type]; showStatus('error','请求失败'); });
 }
+function pollStatus(type) {
+  var btn = document.getElementById('btn-'+type);
+  var timer = setInterval(function(){
+    fetch('/api/status').then(function(r){return r.json();}).then(function(s){
+      var st = s[type]; if(!st) return;
+      if(st.status==='done') { clearInterval(timer); btn.disabled=false; btn.innerHTML='🔄 '+LABELS[type]; showStatus('done',st.message); setTimeout(function(){location.reload();},1500); }
+      else if(st.status==='error') { clearInterval(timer); btn.disabled=false; btn.innerHTML='🔄 '+LABELS[type]; showStatus('error',st.message); }
+      else showStatus('running',st.message);
+    });
+  },2000);
+}
+function showStatus(type,msg) { document.getElementById('statusBar').innerHTML='<span class="status-msg status-'+type+'">'+msg+'</span>'; }
 
-// 页面加载
-window.addEventListener('DOMContentLoaded', function() {
-  const savedTheme = localStorage.getItem('theme') || 'midnight';
-  document.documentElement.setAttribute('data-theme', savedTheme);
-  document.getElementById('themeSelect').value = savedTheme;
-
-  document.querySelector('th[data-col="imdb_rating"]').classList.add('sorted-desc');
-  loadMovies(1);
+// ===== 初始化 =====
+document.addEventListener('DOMContentLoaded', function(){
+  var t = localStorage.getItem('theme')||'light';
+  document.documentElement.setAttribute('data-theme',t);
+  document.getElementById('themeSelect').value = t;
+  document.querySelector('#page-movies th[data-col="imdb_rating"]').classList.add('sorted-desc');
 });
 </script>
 </body>
