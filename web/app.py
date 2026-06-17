@@ -230,6 +230,12 @@ def api_movies():
         LIMIT %s OFFSET %s
     """
     movies = query(data_sql, params + [per_page, offset])
+    # 格式化日期字段
+    for m in movies:
+        for key in ("date_added", "date_modified", "release_date"):
+            val = m.get(key)
+            if val and hasattr(val, "strftime"):
+                m[key] = val.strftime("%Y-%m-%d")
     return jsonify({
         "movies": movies, "total": total, "page": page,
         "per_page": per_page, "total_pages": (total + per_page - 1) // per_page,
