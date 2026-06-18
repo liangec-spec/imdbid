@@ -477,16 +477,22 @@ def get_status():
         return jsonify(task_status)
 
 
-@app.route("/api/poster")
-def api_poster():
-    """图片代理：从 Emby 服务器获取图片返回给前端"""
-    url = request.args.get("url", "")
-    if not url:
-        return "", 400
+@app.route("/api/poster/<path:encoded_url>")
+def api_poster(encoded_url):
+    """图片代理：Base64 编码的 URL"""
+    import base64
+    try:
+        url = base64.urlsafe_b64decode(encoded_url + "==").decode("utf-8")
+    except Exception:
+        return "Invalid URL", 400
 
-    # 安全检查：只允许 Emby 服务器的图片
+    # 安全检查：只允许 Emby 和 TMDB 的图片
     emby_server = EMBY_CONFIG.get("server", "")
-    if not url.startswith(emby_server):
+    allowed = ["https://image.tmdb.org"]
+    if emby_server:
+        allowed.append(emby_server)
+
+    if not any(url.startswith(a) for a in allowed):
         return "Invalid URL", 403
 
     try:
