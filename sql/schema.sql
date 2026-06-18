@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS emby_movies (
     production_year INT COMMENT '制作年份',
     imdb_rating DECIMAL(3,1) COMMENT 'IMDB 评分',
     imdb_votes INT COMMENT 'IMDB 投票数',
+    poster_url VARCHAR(500) COMMENT '封面图片 URL',
     INDEX idx_imdb_id (imdb_id),
     INDEX idx_title (title)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Emby 电影数据';

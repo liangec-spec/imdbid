@@ -82,7 +82,8 @@ th.sortable { cursor:pointer; user-select:none; }
 th.sortable:hover { color:var(--text); background:rgba(255,255,255,.05); }
 th .arrow { font-size:9px; margin-left:3px; opacity:.3; }
 th.sorted-asc .arrow.up, th.sorted-desc .arrow.down { opacity:1; color:var(--green); }
-td { padding:9px 14px; border-top:1px solid rgba(255,255,255,.04); font-size:13px; }
+td { padding:9px 14px; border-top:1px solid rgba(255,255,255,.04); font-size:13px; vertical-align:middle; }
+.poster-thumb { width:36px; height:52px; border-radius:4px; object-fit:cover; background:var(--bg3); vertical-align:middle; margin-right:8px; }
 /* hover 不变色 */
 .clickable-row { cursor:pointer; }
 .clickable-row td:first-child::before { content:'▶'; display:inline-block; margin-right:5px; font-size:9px; transition:transform .2s; color:var(--dim); }
@@ -468,9 +469,10 @@ function renderMovies(movies) {
     var tr = document.createElement('tr');
     tr.className = 'clickable-row';
     tr.onclick = function(){ toggleDetail(this); };
+    var posterHtml = m.poster_url ? '<img class="poster-thumb" src="'+m.poster_url+'" loading="lazy" alt="">' : '';
     tr.innerHTML =
       '<td>'+((moviePage-1)*PER_PAGE+i+1)+'</td>'+
-      '<td>'+m.title+(m.original_title&&m.original_title!==m.title?'<br><span style="color:var(--dim);font-size:11px">'+m.original_title+'</span>':'')+'</td>'+
+      '<td>'+posterHtml+m.title+(m.original_title&&m.original_title!==m.title?'<br><span style="color:var(--dim);font-size:11px">'+m.original_title+'</span>':'')+'</td>'+
       '<td>'+(m.year||'-')+'</td>'+
       '<td>'+fmtRating(m.imdb_rating,m.imdb_votes)+'</td>'+
       '<td>'+(m.imdb_id?'<a href="https://www.imdb.com/title/'+m.imdb_id+'/" target="_blank">'+m.imdb_id+'</a>':'-')+'</td>'+

@@ -209,7 +209,7 @@ def api_movies():
             e.imdb_rating, e.imdb_votes, e.genres, e.studios, e.countries,
             e.directors, e.actors, e.overview, e.runtime, e.release_date,
             e.official_rating, e.video_codec, e.audio_codec, e.size,
-            e.path, e.tags, e.date_added, e.video_resolution,
+            e.path, e.tags, e.date_added, e.video_resolution, e.poster_url,
             CASE
                 WHEN e.path LIKE '%%2160p%%' THEN '4K'
                 WHEN e.path LIKE '%%1080p%%' THEN '1080p'

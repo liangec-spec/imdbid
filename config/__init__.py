@@ -36,7 +36,7 @@ EXPORT_FIELDS = [
     "release_date", "genres", "studios", "countries", "directors", "actors",
     "path", "size", "container", "video_codec", "audio_codec", "video_resolution",
     "date_added", "date_modified", "tags", "official_rating", "production_year",
-    "imdb_rating", "imdb_votes",
+    "imdb_rating", "imdb_votes", "poster_url",
 ]
 
 # 项目根目录

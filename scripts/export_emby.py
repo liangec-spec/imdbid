@@ -80,7 +80,7 @@ def get_all_movies(server: str, api_key: str, parent_id: str) -> List[Dict]:
                 break
 
             for item in items:
-                movies.append(parse_movie(item))
+                movies.append(parse_movie(item, server))
 
             start_index += page_size
             if len(items) < page_size:
@@ -94,7 +94,7 @@ def get_all_movies(server: str, api_key: str, parent_id: str) -> List[Dict]:
     return movies
 
 
-def parse_movie(item: Dict) -> Dict:
+def parse_movie(item: Dict, server: str = "") -> Dict:
     """解析 Emby 返回的电影数据"""
     provider_ids = item.get("ProviderIds", {})
     media_sources = item.get("MediaSources", [{}])[0] if item.get("MediaSources") else {}
@@ -127,6 +127,12 @@ def parse_movie(item: Dict) -> Dict:
 
     imdb_id = provider_ids.get("Imdb", "")
 
+    # 生成封面 URL
+    image_tags = item.get("ImageTags", {})
+    primary_tag = image_tags.get("Primary", "")
+    emby_id = item.get("Id", "")
+    poster_url = f"{server}/Items/{emby_id}/Images/Primary?tag={primary_tag}" if primary_tag and server else ""
+
     return {
         "title": item.get("Name", ""),
         "original_title": item.get("OriginalTitle", ""),
@@ -158,6 +164,7 @@ def parse_movie(item: Dict) -> Dict:
         "tags": "|".join(tags),
         "imdb_rating": "",
         "imdb_votes": "",
+        "poster_url": poster_url,
     }
 
 
@@ -185,14 +192,14 @@ def save_to_mysql(movies: List[Dict]):
                 release_date, genres, studios, countries, directors, actors,
                 path, size, container, video_codec, audio_codec, video_resolution,
                 date_added, date_modified, tags, official_rating, production_year,
-                imdb_rating, imdb_votes
+                imdb_rating, imdb_votes, poster_url
             ) VALUES (
                 %s, %s, %s, %s, %s, %s,
                 %s, %s, %s, %s, %s,
                 %s, %s, %s, %s, %s, %s,
                 %s, %s, %s, %s, %s, %s,
                 %s, %s, %s, %s, %s,
-                %s, %s
+                %s, %s, %s
             )"""
 
             def val(v):
@@ -211,6 +218,7 @@ def save_to_mysql(movies: List[Dict]):
                     m.get("date_added"), m.get("date_modified"), m.get("tags"),
                     m.get("official_rating"), val(m.get("production_year")),
                     val(m.get("imdb_rating")), val(m.get("imdb_votes")),
+                    m.get("poster_url") or None,
                 ))
 
             conn.commit()
