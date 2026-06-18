@@ -30,6 +30,8 @@ services:
       EMBY_SERVER: ${EMBY_SERVER}
       EMBY_API_KEY: ${EMBY_API_KEY}
       EMBY_PARENT_ID: ${EMBY_PARENT_ID}
+      EMBY_COLLECTIONS_PARENT_ID: ${EMBY_COLLECTIONS_PARENT_ID:-43626}
+      TMDB_API_KEY: ${TMDB_API_KEY}
     volumes:
       - app-data:/app/data
     depends_on:
