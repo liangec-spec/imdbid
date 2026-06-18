@@ -119,3 +119,21 @@ CREATE TABLE IF NOT EXISTS emby_collection_movies (
     INDEX idx_in_emby (in_emby),
     FOREIGN KEY (collection_id) REFERENCES emby_collections(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='合集电影';
+
+-- 即将上映电影表
+CREATE TABLE IF NOT EXISTS upcoming_movies (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    region VARCHAR(10) NOT NULL COMMENT '地区 (CN/US)',
+    tmdb_id VARCHAR(20) NOT NULL COMMENT 'TMDB 电影 ID',
+    title VARCHAR(255) COMMENT '中文标题',
+    original_title VARCHAR(255) COMMENT '原始标题',
+    release_date DATE COMMENT '上映日期',
+    rating DECIMAL(3,1) COMMENT '评分',
+    popularity DECIMAL(10,4) COMMENT '热度',
+    overview TEXT COMMENT '简介',
+    poster_url VARCHAR(500) COMMENT '海报 URL',
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_region_tmdb (region, tmdb_id),
+    INDEX idx_region (region),
+    INDEX idx_release_date (release_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='即将上映电影';

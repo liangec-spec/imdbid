@@ -189,6 +189,7 @@ a:hover { text-decoration:underline; }
       <button class="btn btn-ghost" onclick="triggerUpdate('imdb')" id="btn-imdb">🔄 IMDB</button>
       <button class="btn btn-ghost" onclick="triggerUpdate('douban')" id="btn-douban">🔄 豆瓣</button>
       <button class="btn btn-ghost" onclick="triggerUpdate('collections')" id="btn-collections">🔄 合集</button>
+      <button class="btn btn-ghost" onclick="triggerUpdate('upcoming')" id="btn-upcoming">🔄 即将上映</button>
     </div>
   </div>
 
@@ -703,7 +704,7 @@ function renderPag(id, page, total, cb) {
 }
 
 // ===== 更新功能 =====
-var LABELS = {emby:'Emby清单',imdb:'IMDB 250',douban:'豆瓣250',collections:'合集'};
+var LABELS = {emby:'Emby清单',imdb:'IMDB 250',douban:'豆瓣250',collections:'合集',upcoming:'即将上映'};
 function triggerUpdate(type) {
   var btn = document.getElementById('btn-'+type);
   btn.disabled = true;

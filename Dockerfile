@@ -5,11 +5,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# 安装系统依赖
+# 安装系统依赖（包括 cron）
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     default-libmysqlclient-dev \
     curl \
+    cron \
     && rm -rf /var/lib/apt/lists/*
 
 # 复制依赖文件并安装
@@ -27,18 +28,16 @@ COPY web/ web/
 COPY sql/ sql/
 COPY data/douban_mapping.json data/douban_mapping.json
 
-# 创建数据目录并设置权限
-RUN mkdir -p /app/data && chown -R appuser:appuser /app
+# 创建数据和日志目录
+RUN mkdir -p /app/data /app/logs && chown -R appuser:appuser /app
 
-# 切换到非 root 用户
-USER appuser
-
-# 健康检查
-HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-    CMD curl -f http://localhost:5000/ || exit 1
+# 添加 cron 任务（每天凌晨 3 点同步即将上映电影）
+RUN echo "0 3 * * * cd /app && python scripts/sync_upcoming.py >> /app/logs/upcoming.log 2>&1" > /etc/cron.d/upcoming-sync \
+    && chmod 0644 /etc/cron.d/upcoming-sync \
+    && crontab /etc/cron.d/upcoming-sync
 
 # 暴露端口
 EXPOSE 5000
 
-# 生产环境使用 Gunicorn
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "4", "--timeout", "120", "web.app:app"]
+# 启动 cron + Gunicorn
+CMD ["sh", "-c", "cron && gunicorn --bind 0.0.0.0:5000 --workers 4 --timeout 120 web.app:app"]

@@ -1,0 +1,117 @@
+#!/usr/bin/env python3
+"""
+同步即将上映电影到数据库
+从 TMDB API 获取中国和美国即将上映的电影，存入数据库
+"""
+import os
+import sys
+import json
+from datetime import datetime, timedelta
+
+import requests
+import pymysql
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config import DB_CONFIG, TMDB_API_KEY
+
+
+def fetch_upcoming(region, limit=50):
+    """从 TMDB 获取即将上映电影"""
+    today = datetime.now().strftime("%Y-%m-%d")
+    one_year = (datetime.now() + timedelta(days=365)).strftime("%Y-%m-%d")
+
+    lang = "zh" if region == "CN" else "en"
+    params = {
+        "api_key": TMDB_API_KEY,
+        "language": "zh-CN",
+        "with_original_language": lang,
+        "primary_release_date.gte": today,
+        "primary_release_date.lte": one_year,
+        "sort_by": "popularity.desc",
+    }
+
+    all_movies = []
+    for page in range(1, 6):
+        params["page"] = page
+        resp = requests.get(
+            "https://api.themoviedb.org/3/discover/movie",
+            params=params,
+            timeout=15,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        for m in data.get("results", []):
+            poster_path = m.get("poster_path", "")
+            all_movies.append({
+                "tmdb_id": str(m.get("id", "")),
+                "title": m.get("title", ""),
+                "original_title": m.get("original_title", ""),
+                "release_date": m.get("release_date") or None,
+                "rating": m.get("vote_average", 0),
+                "popularity": m.get("popularity", 0),
+                "overview": m.get("overview", ""),
+                "poster_url": f"https://image.tmdb.org/t/p/w300{poster_path}" if poster_path else "",
+            })
+        if len(data.get("results", [])) < 20:
+            break
+
+    # 按上映日期排序
+    all_movies.sort(key=lambda x: x.get("release_date") or "9999")
+    return all_movies[:limit]
+
+
+def save_to_db(region, movies):
+    """保存到数据库"""
+    conn = pymysql.connect(**DB_CONFIG)
+    try:
+        with conn.cursor() as cur:
+            # 删除该地区的旧数据
+            cur.execute("DELETE FROM upcoming_movies WHERE region = %s", (region,))
+            deleted = cur.rowcount
+
+            # 插入新数据
+            sql = """
+                INSERT INTO upcoming_movies
+                (region, tmdb_id, title, original_title, release_date, rating, popularity, overview, poster_url)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """
+            for m in movies:
+                cur.execute(sql, (
+                    region,
+                    m["tmdb_id"],
+                    m["title"],
+                    m["original_title"],
+                    m["release_date"],
+                    m["rating"],
+                    m["popularity"],
+                    m["overview"],
+                    m["poster_url"],
+                ))
+
+            conn.commit()
+            print(f"  {region}: 删除 {deleted} 条，插入 {len(movies)} 条")
+    finally:
+        conn.close()
+
+
+def sync_upcoming():
+    """同步即将上映电影"""
+    if not TMDB_API_KEY:
+        print("错误：未配置 TMDB API Key")
+        return
+
+    print("同步即将上映电影...")
+
+    for region in ["CN", "US"]:
+        print(f"\n获取 {region} 即将上映电影...")
+        try:
+            movies = fetch_upcoming(region, limit=50)
+            save_to_db(region, movies)
+        except Exception as e:
+            print(f"  {region} 同步失败: {e}")
+
+    print("\n✅ 同步完成")
+
+
+if __name__ == "__main__":
+    sync_upcoming()

@@ -26,6 +26,7 @@ SCRIPTS = {
     "imdb": os.path.join(PROJECT_ROOT, "scripts", "fetch_imdb_top250.py"),
     "douban": os.path.join(PROJECT_ROOT, "scripts", "fetch_douban_top250.py"),
     "collections": os.path.join(PROJECT_ROOT, "scripts", "sync_collections.py"),
+    "upcoming": os.path.join(PROJECT_ROOT, "scripts", "sync_upcoming.py"),
 }
 
 # 映射文件路径
@@ -35,7 +36,7 @@ MAPPING_FILE = os.path.join(DATA_DIR, "douban_mapping.json")
 EMBY_COLLECTIONS_PARENT_ID = os.getenv("EMBY_COLLECTIONS_PARENT_ID", "43626")
 
 # 任务状态
-task_status = {"emby": None, "imdb": None, "douban": None, "collections": None}
+task_status = {"emby": None, "imdb": None, "douban": None, "collections": None, "upcoming": None}
 status_lock = threading.Lock()
 
 
@@ -434,56 +435,40 @@ def update_collections():
 
 @app.route("/api/upcoming")
 def api_upcoming():
-    """获取即将上映电影（中国和美国）"""
+    """从数据库获取即将上映电影"""
     region = request.args.get("region", "CN", type=str)
     limit = request.args.get("limit", 50, type=int)
 
-    if not TMDB_API_KEY:
-        return jsonify({"error": "未配置 TMDB API Key"}), 400
+    movies = query("""
+        SELECT tmdb_id, title, original_title, release_date,
+               rating, popularity, overview, poster_url
+        FROM upcoming_movies
+        WHERE region = %s
+        ORDER BY release_date ASC
+        LIMIT %s
+    """, (region, limit))
 
-    from datetime import datetime, timedelta
-    today = datetime.now().strftime("%Y-%m-%d")
-    one_year = (datetime.now() + timedelta(days=365)).strftime("%Y-%m-%d")
+    # 转换类型
+    for m in movies:
+        m["rating"] = float(m["rating"]) if m["rating"] else 0
+        m["popularity"] = float(m["popularity"]) if m["popularity"] else 0
+        if m.get("release_date") and hasattr(m["release_date"], "strftime"):
+            m["release_date"] = m["release_date"].strftime("%Y-%m-%d")
+        m["poster"] = m.get("poster_url") or ""
+        m["tmdb_id"] = m.get("tmdb_id") or ""
 
-    try:
-        all_movies = []
-        for page in range(1, 4):  # 获取前3页
-            resp = requests.get(
-                "https://api.themoviedb.org/3/discover/movie",
-                params={
-                    "api_key": TMDB_API_KEY,
-                    "language": "zh-CN",
-                    "region": region,
-                    "primary_release_date.gte": today,
-                    "primary_release_date.lte": one_year,
-                    "sort_by": "popularity.desc",
-                    "page": page,
-                },
-                timeout=15,
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            for m in data.get("results", []):
-                all_movies.append({
-                    "id": m.get("id"),
-                    "title": m.get("title", ""),
-                    "original_title": m.get("original_title", ""),
-                    "release_date": m.get("release_date", ""),
-                    "rating": m.get("vote_average", 0),
-                    "popularity": m.get("popularity", 0),
-                    "overview": m.get("overview", ""),
-                    "poster": f"https://image.tmdb.org/t/p/w300{m['poster_path']}" if m.get("poster_path") else "",
-                    "backdrop": f"https://image.tmdb.org/t/p/w780{m['backdrop_path']}" if m.get("backdrop_path") else "",
-                    "tmdb_id": str(m.get("id", "")),
-                })
-            if len(data.get("results", [])) < 20:
-                break
+    return jsonify({"movies": movies, "region": region})
 
-        # 按热度排序，取前 N 部
-        all_movies.sort(key=lambda x: x["popularity"], reverse=True)
-        return jsonify({"movies": all_movies[:limit], "region": region})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/update/upcoming", methods=["POST"])
+def update_upcoming():
+    with status_lock:
+        s = task_status.get("upcoming") or {}
+        if s.get("status") == "running":
+            return jsonify({"status": "busy", "message": "任务正在执行中"})
+    thread = threading.Thread(target=run_task, args=("upcoming", [sys.executable, SCRIPTS["upcoming"]]))
+    thread.start()
+    return jsonify({"status": "started"})
 
 
 @app.route("/api/status")
