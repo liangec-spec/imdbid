@@ -432,6 +432,60 @@ def update_collections():
     return jsonify({"status": "started"})
 
 
+@app.route("/api/upcoming")
+def api_upcoming():
+    """获取即将上映电影（中国和美国）"""
+    region = request.args.get("region", "CN", type=str)
+    limit = request.args.get("limit", 50, type=int)
+
+    if not TMDB_API_KEY:
+        return jsonify({"error": "未配置 TMDB API Key"}), 400
+
+    from datetime import datetime, timedelta
+    today = datetime.now().strftime("%Y-%m-%d")
+    one_year = (datetime.now() + timedelta(days=365)).strftime("%Y-%m-%d")
+
+    try:
+        all_movies = []
+        for page in range(1, 4):  # 获取前3页
+            resp = requests.get(
+                "https://api.themoviedb.org/3/discover/movie",
+                params={
+                    "api_key": TMDB_API_KEY,
+                    "language": "zh-CN",
+                    "region": region,
+                    "primary_release_date.gte": today,
+                    "primary_release_date.lte": one_year,
+                    "sort_by": "popularity.desc",
+                    "page": page,
+                },
+                timeout=15,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            for m in data.get("results", []):
+                all_movies.append({
+                    "id": m.get("id"),
+                    "title": m.get("title", ""),
+                    "original_title": m.get("original_title", ""),
+                    "release_date": m.get("release_date", ""),
+                    "rating": m.get("vote_average", 0),
+                    "popularity": m.get("popularity", 0),
+                    "overview": m.get("overview", ""),
+                    "poster": f"https://image.tmdb.org/t/p/w300{m['poster_path']}" if m.get("poster_path") else "",
+                    "backdrop": f"https://image.tmdb.org/t/p/w780{m['backdrop_path']}" if m.get("backdrop_path") else "",
+                    "tmdb_id": str(m.get("id", "")),
+                })
+            if len(data.get("results", [])) < 20:
+                break
+
+        # 按热度排序，取前 N 部
+        all_movies.sort(key=lambda x: x["popularity"], reverse=True)
+        return jsonify({"movies": all_movies[:limit], "region": region})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/status")
 def get_status():
     with status_lock:
