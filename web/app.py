@@ -477,13 +477,33 @@ def get_status():
         return jsonify(task_status)
 
 
+@app.route("/api/poster")
+def api_poster():
+    """图片代理：从 Emby 服务器获取图片返回给前端"""
+    url = request.args.get("url", "")
+    if not url:
+        return "", 400
+
+    # 安全检查：只允许 Emby 服务器的图片
+    emby_server = EMBY_CONFIG.get("server", "")
+    if not url.startswith(emby_server):
+        return "Invalid URL", 403
+
+    try:
+        resp = requests.get(url, timeout=10)
+        resp.raise_for_status()
+        return resp.content, 200, {"Content-Type": resp.headers.get("Content-Type", "image/jpeg")}
+    except Exception:
+        return "", 502
+
+
 # ========== 合集管理 API ==========
 
 @app.route("/api/collections")
 def api_collections():
     """从数据库获取合集列表"""
     rows = query("""
-        SELECT id, emby_id, name, tmdb_id, child_count, total_count, missing_count, overview
+        SELECT id, emby_id, name, tmdb_id, child_count, total_count, missing_count, overview, poster_url
         FROM emby_collections
         ORDER BY name
     """)
@@ -497,6 +517,7 @@ def api_collection_detail(collection_id):
         SELECT c.name, c.original_title, c.year, c.rating, c.imdb_rating, c.imdb_votes,
                c.imdb_id, c.tmdb_id, c.overview, c.genres, c.directors, c.actors, c.studios,
                c.video_codec, c.audio_codec, c.size, c.video_resolution, c.path, c.in_emby,
+               c.poster_url,
                e.imdb_rating AS emby_imdb_rating, e.imdb_votes AS emby_imdb_votes
         FROM emby_collection_movies c
         LEFT JOIN emby_movies e ON c.imdb_id = e.imdb_id
@@ -504,12 +525,18 @@ def api_collection_detail(collection_id):
         ORDER BY c.in_emby DESC, c.year ASC
     """, (collection_id,))
 
-    # 补充 IMDB 评分
+    # 补充字段
     for m in movies:
+        m["title"] = m.get("name") or ""
         if not m.get("imdb_rating") and m.get("emby_imdb_rating"):
             m["imdb_rating"] = m["emby_imdb_rating"]
         if not m.get("imdb_votes") and m.get("emby_imdb_votes"):
             m["imdb_votes"] = m["emby_imdb_votes"]
+        # 从 emby_movies 补充 poster_url
+        if not m.get("poster_url") and m.get("imdb_id"):
+            emby = query("SELECT poster_url FROM emby_movies WHERE imdb_id = %s", (m["imdb_id"],))
+            if emby and emby[0].get("poster_url"):
+                m["poster_url"] = emby[0]["poster_url"]
 
         # 计算分辨率标签和位置
         path = m.get("path") or ""

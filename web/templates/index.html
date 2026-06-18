@@ -76,25 +76,27 @@ body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; backg
 
 /* 表格 */
 .table-wrap { background:var(--bg2); border-radius:var(--radius-lg); overflow:hidden; border:1px solid var(--border); }
-table { width:100%; border-collapse:collapse; }
-th { background:var(--bg2); color:var(--dim); text-align:left; padding:10px 14px; font-size:12px; text-transform:uppercase; letter-spacing:.5px; white-space:nowrap; }
+table { width:100%; border-collapse:collapse; table-layout:fixed; }
+th { background:var(--bg2); color:var(--dim); text-align:left; padding:10px 14px; font-size:12px; text-transform:uppercase; letter-spacing:.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 th.sortable { cursor:pointer; user-select:none; }
 th.sortable:hover { color:var(--text); background:rgba(255,255,255,.05); }
 th .arrow { font-size:9px; margin-left:3px; opacity:.3; }
 th.sorted-asc .arrow.up, th.sorted-desc .arrow.down { opacity:1; color:var(--green); }
-td { padding:9px 14px; border-top:1px solid rgba(255,255,255,.04); font-size:13px; vertical-align:middle; }
-.poster-thumb { width:36px; height:52px; border-radius:4px; object-fit:cover; background:var(--bg3); vertical-align:middle; margin-right:8px; }
+td { padding:10px 14px; border-top:1px solid rgba(255,255,255,.04); font-size:14px; vertical-align:middle; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+td:nth-child(2) { font-size:15px; font-weight:600; white-space:normal; }
+.poster-thumb { width:40px; height:56px; border-radius:4px; object-fit:cover; background:var(--bg3); vertical-align:middle; margin-right:10px; }
 /* hover 不变色 */
 .clickable-row { cursor:pointer; }
 .clickable-row td:first-child::before { content:'▶'; display:inline-block; margin-right:5px; font-size:9px; transition:transform .2s; color:var(--dim); }
 .clickable-row.expanded td:first-child::before { transform:rotate(90deg); }
-.detail-row { display:none; }
-.detail-row.active { display:table-row; }
-.detail-cell { padding:16px 20px; background:var(--bg); border-top:2px solid var(--accent); }
-.detail-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:14px; font-size:13px; }
-.detail-item { display:flex; flex-direction:column; gap:3px; }
-.detail-label { color:var(--dim); font-size:11px; font-weight:500; }
-.detail-value { color:var(--text); line-height:1.5; }
+.detail-row { display:none; overflow:hidden; }
+.detail-row.active { display:table-row; animation:slideDown .25s ease-out; }
+@keyframes slideDown { from { opacity:0; max-height:0; } to { opacity:1; max-height:800px; } }
+.detail-cell { padding:16px 20px; background:var(--bg); border-top:2px solid var(--accent); overflow:hidden; }
+.detail-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; font-size:13px; }
+.detail-item { display:flex; flex-direction:column; gap:3px; min-width:0; overflow:hidden; }
+.detail-label { color:var(--dim); font-size:11px; font-weight:500; flex-shrink:0; }
+.detail-value { color:var(--text); line-height:1.5; word-break:break-word; }
 a { color:var(--accent); text-decoration:none; }
 a:hover { text-decoration:underline; }
 .badge { display:inline-block; font-size:10px; padding:2px 7px; border-radius:10px; font-weight:600; }
@@ -154,19 +156,20 @@ a:hover { text-decoration:underline; }
       <span class="icon">🎬</span><span>电影</span>
       <span class="badge" id="navMovieCount">{{ emby_total }}</span>
     </div>
+    <div class="nav-item" onclick="switchPage('collections')">
+      <span class="icon">📁</span><span>合集</span>
+      <span class="badge" id="navCollectionCount">-</span>
+    </div>
     <div class="nav-item" onclick="switchPage('douban')">
       <span class="icon">📗</span><span>豆瓣 Top 250</span>
-      <span class="badge" id="navDoubanMissing">{{ douban_missing_count }}</span>
+      <span class="badge" id="navDoubanCount">-</span>
     </div>
     <div class="nav-item" onclick="switchPage('imdb')">
       <span class="icon">📙</span><span>IMDB Top 250</span>
-      <span class="badge" id="navImdbMissing">{{ imdb_missing_count }}</span>
-    </div>
-    <div class="nav-item" onclick="switchPage('collections')">
-      <span class="icon">📁</span><span>合集</span>
+      <span class="badge" id="navImdbCount">-</span>
     </div>
     <div class="nav-item" onclick="switchPage('upcoming')">
-      <span class="icon">🎬</span><span>即将上映</span>
+      <span class="icon">📅</span><span>即将上映</span>
     </div>
   </div>
   <div class="sidebar-footer">
@@ -186,11 +189,6 @@ a:hover { text-decoration:underline; }
     </div>
     <div class="topbar-right">
       <div class="status-bar" id="statusBar"></div>
-      <button class="btn btn-ghost" onclick="triggerUpdate('emby')" id="btn-emby">🔄 Emby</button>
-      <button class="btn btn-ghost" onclick="triggerUpdate('imdb')" id="btn-imdb">🔄 IMDB</button>
-      <button class="btn btn-ghost" onclick="triggerUpdate('douban')" id="btn-douban">🔄 豆瓣</button>
-      <button class="btn btn-ghost" onclick="triggerUpdate('collections')" id="btn-collections">🔄 合集</button>
-      <button class="btn btn-ghost" onclick="triggerUpdate('upcoming')" id="btn-upcoming">🔄 即将上映</button>
     </div>
   </div>
 
@@ -215,6 +213,16 @@ a:hover { text-decoration:underline; }
           <div class="label">电影合集</div>
         </div>
       </div>
+      <div style="margin-top:24px">
+        <h3 style="margin-bottom:12px;font-size:16px">数据更新</h3>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-primary" onclick="triggerUpdate('emby')" id="btn-emby">🔄 更新 Emby</button>
+          <button class="btn btn-primary" onclick="triggerUpdate('imdb')" id="btn-imdb">🔄 更新 IMDB 250</button>
+          <button class="btn btn-primary" onclick="triggerUpdate('douban')" id="btn-douban">🔄 更新豆瓣 250</button>
+          <button class="btn btn-primary" onclick="triggerUpdate('collections')" id="btn-collections">🔄 更新合集</button>
+          <button class="btn btn-primary" onclick="triggerUpdate('upcoming')" id="btn-upcoming">🔄 更新即将上映</button>
+        </div>
+      </div>
     </div>
 
     <!-- 电影页 -->
@@ -233,17 +241,17 @@ a:hover { text-decoration:underline; }
         <table>
           <thead>
             <tr>
-              <th>#</th>
-              <th class="sortable" data-col="title" onclick="changeMovieSort('title')">电影名称 <span class="arrow up">▲</span><span class="arrow down">▼</span></th>
-              <th class="sortable" data-col="year" onclick="changeMovieSort('year')">年份 <span class="arrow up">▲</span><span class="arrow down">▼</span></th>
-              <th class="sortable" data-col="imdb_rating" onclick="changeMovieSort('imdb_rating')">IMDB评分 <span class="arrow up">▲</span><span class="arrow down">▼</span></th>
-              <th>IMDB ID</th>
-              <th>TMDB ID</th>
-              <th>分辨率</th>
-              <th>位置</th>
-              <th class="sortable" data-col="date_added" onclick="changeMovieSort('date_added')">加入日期 <span class="arrow up">▲</span><span class="arrow down">▼</span></th>
-              <th>IMDB</th>
-              <th>豆瓣</th>
+              <th style="width:4%">#</th>
+              <th class="sortable" data-col="title" onclick="changeMovieSort('title')" style="width:22%">电影名称 <span class="arrow up">▲</span><span class="arrow down">▼</span></th>
+              <th class="sortable" data-col="year" onclick="changeMovieSort('year')" style="width:6%">年份 <span class="arrow up">▲</span><span class="arrow down">▼</span></th>
+              <th class="sortable" data-col="imdb_rating" onclick="changeMovieSort('imdb_rating')" style="width:10%">IMDB评分 <span class="arrow up">▲</span><span class="arrow down">▼</span></th>
+              <th style="width:10%">IMDB ID</th>
+              <th style="width:10%">TMDB ID</th>
+              <th style="width:8%">分辨率</th>
+              <th style="width:8%">位置</th>
+              <th class="sortable" data-col="date_added" onclick="changeMovieSort('date_added')" style="width:10%">加入日期 <span class="arrow up">▲</span><span class="arrow down">▼</span></th>
+              <th style="width:6%">IMDB</th>
+              <th style="width:6%">豆瓣</th>
             </tr>
           </thead>
           <tbody id="movieTbody"></tbody>
@@ -347,10 +355,10 @@ a:hover { text-decoration:underline; }
         <table>
           <thead>
             <tr>
-              <th>#</th>
-              <th>合集名称</th>
-              <th>收录状态</th>
-              <th>TMDB ID</th>
+              <th style="width:5%">#</th>
+              <th style="width:40%">合集名称</th>
+              <th style="width:30%">收录状态</th>
+              <th style="width:25%">TMDB ID</th>
             </tr>
           </thead>
           <tbody id="collectionTbody"></tbody>
@@ -413,8 +421,15 @@ function makeDetailRow(cols, html) {
 function detailHtml(m) {
   var actors = m.actors || '-';
   var actorsShort = actors.length > 40 ? '<span title="' + actors.replace(/"/g,'&quot;') + '">' + actors.substring(0,40) + '...</span>' : actors;
-  return '<div class="detail-grid">' +
-    '<div class="detail-item" style="grid-column:1/-1"><span class="detail-label">简介</span><span class="detail-value">' + (m.overview||'-') + '</span></div>' +
+  var posterHtml = m.poster_url ? '<img src="/api/poster?url=' + encodeURIComponent(m.poster_url) + '" style="width:140px;height:210px;object-fit:cover;border-radius:8px">' : '';
+  return '<div style="display:flex;gap:20px;margin-bottom:16px">' +
+    (posterHtml ? '<div style="flex-shrink:0">' + posterHtml + '</div>' : '') +
+    '<div style="flex:1;min-width:0">' +
+    '<div style="font-size:16px;font-weight:600;margin-bottom:4px">' + m.title + '</div>' +
+    (m.original_title && m.original_title !== m.title ? '<div style="color:var(--dim);font-size:13px;margin-bottom:8px">' + m.original_title + '</div>' : '') +
+    '<div style="color:var(--dim);font-size:13px;line-height:1.6;white-space:pre-wrap">' + (m.overview || '-') + '</div>' +
+    '</div></div>' +
+    '<div class="detail-grid">' +
     '<div class="detail-item"><span class="detail-label">导演</span><span class="detail-value">' + (m.directors||'-') + '</span></div>' +
     '<div class="detail-item"><span class="detail-label">演员</span><span class="detail-value">' + actorsShort + '</span></div>' +
     '<div class="detail-item"><span class="detail-label">Emby 评分</span><span class="detail-value">' + (m.rating ? '⭐ '+parseFloat(m.rating).toFixed(1) : '-') + '</span></div>' +
@@ -469,7 +484,7 @@ function renderMovies(movies) {
     var tr = document.createElement('tr');
     tr.className = 'clickable-row';
     tr.onclick = function(){ toggleDetail(this); };
-    var posterHtml = m.poster_url ? '<img class="poster-thumb" src="'+m.poster_url+'" loading="lazy" alt="">' : '';
+    var posterHtml = m.poster_url ? '<img class="poster-thumb" src="/api/poster?url='+encodeURIComponent(m.poster_url)+'"' loading="lazy" alt="">' : '';
     tr.innerHTML =
       '<td>'+((moviePage-1)*PER_PAGE+i+1)+'</td>'+
       '<td>'+posterHtml+m.title+(m.original_title&&m.original_title!==m.title?'<br><span style="color:var(--dim);font-size:11px">'+m.original_title+'</span>':'')+'</td>'+
@@ -638,12 +653,13 @@ function renderCollectionsPage() {
   page.forEach(function(c,i){
     var owned = (c.total_count||0) - (c.missing_count||0);
     var status = c.total_count>0?(c.missing_count===0?'<span class="badge badge-green">✓ 全部收录 ('+owned+')</span>':'<span style="color:var(--green)">'+owned+'</span> / <span style="color:var(--red)">'+c.missing_count+' 未收录</span>'):'-';
+    var posterHtml = c.poster_url ? '<img class="poster-thumb" src="'+c.poster_url+'" loading="lazy" alt="">' : '';
     var tr = document.createElement('tr');
     tr.className = 'clickable-row';
     tr.onclick = function(){ toggleCollection(c.id, this); };
     tr.innerHTML =
       '<td>'+(start+i+1)+'</td>'+
-      '<td>📁 '+c.name+'</td>'+
+      '<td>'+posterHtml+c.name+'</td>'+
       '<td>'+status+'</td>'+
       '<td>'+(c.tmdb_id?'<a href="https://www.themoviedb.org/collection/'+c.tmdb_id+'" target="_blank">'+c.tmdb_id+'</a>':'-')+'</td>';
     tbody.appendChild(tr);
@@ -663,11 +679,12 @@ function toggleCollection(id, row) {
     var html = '';
     if (d.movies.length) {
       html += '<div style="margin-bottom:8px;font-size:12px;color:var(--dim)">已收录 ('+d.movies.length+')</div>';
-      html += '<table style="width:100%;margin:0"><thead><tr><th>#</th><th>电影</th><th>年份</th><th>IMDB评分</th><th>IMDB ID</th><th>TMDB ID</th><th>分辨率</th></tr></thead><tbody>';
+      html += '<table style="width:100%;margin:0;table-layout:fixed"><thead><tr><th style="width:5%">#</th><th style="width:35%">电影</th><th style="width:8%">年份</th><th style="width:12%">IMDB评分</th><th style="width:12%">IMDB ID</th><th style="width:12%">TMDB ID</th><th style="width:16%">分辨率</th></tr></thead><tbody>';
       d.movies.forEach(function(m,i){
+        var posterHtml = m.poster_url ? '<img class="poster-thumb" src="/api/poster?url='+encodeURIComponent(m.poster_url)+'"' loading="lazy" alt="">' : '';
         html += '<tr class="clickable-row" onclick="toggleDetail(this)">'+
           '<td>'+(i+1)+'</td>'+
-          '<td>'+m.name+(m.original_title&&m.original_title!==m.name?'<br><span style="color:var(--dim);font-size:11px">'+m.original_title+'</span>':'')+'</td>'+
+          '<td>'+posterHtml+m.name+(m.original_title&&m.original_title!==m.name?'<br><span style="color:var(--dim);font-size:11px">'+m.original_title+'</span>':'')+'</td>'+
           '<td>'+(m.year||'-')+'</td>'+
           '<td>'+fmtRating(m.imdb_rating,m.imdb_votes)+'</td>'+
           '<td>'+(m.imdb_id?'<a href="https://www.imdb.com/title/'+m.imdb_id+'/" target="_blank">'+m.imdb_id+'</a>':'-')+'</td>'+
@@ -679,9 +696,10 @@ function toggleCollection(id, row) {
     }
     if (d.missing.length) {
       html += '<div style="margin-top:12px;margin-bottom:8px;font-size:12px;color:var(--red)">未收录 ('+d.missing.length+')</div>';
-      html += '<table style="width:100%;margin:0"><thead><tr><th>#</th><th>电影</th><th>年份</th><th>评分</th><th>TMDB ID</th></tr></thead><tbody>';
+      html += '<table style="width:100%;margin:0;table-layout:fixed"><thead><tr><th style="width:5%">#</th><th style="width:40%">电影</th><th style="width:10%">年份</th><th style="width:15%">评分</th><th style="width:30%">TMDB ID</th></tr></thead><tbody>';
       d.missing.forEach(function(m,i){
-        html += '<tr style="opacity:.5"><td>'+(i+1)+'</td><td>'+m.name+'</td><td>'+(m.year||'-')+'</td><td>'+(m.rating?'⭐ '+parseFloat(m.rating).toFixed(1):'-')+'</td><td><a href="https://www.themoviedb.org/movie/'+m.tmdb_id+'" target="_blank">'+m.tmdb_id+'</a></td></tr>';
+        var posterHtml = m.poster_url ? '<img class="poster-thumb" src="/api/poster?url='+encodeURIComponent(m.poster_url)+'"' loading="lazy" alt="">' : '';
+        html += '<tr style="opacity:.5"><td>'+(i+1)+'</td><td>'+posterHtml+m.name+'</td><td>'+(m.year||'-')+'</td><td>'+(m.rating?'⭐ '+parseFloat(m.rating).toFixed(1):'-')+'</td><td><a href="https://www.themoviedb.org/movie/'+m.tmdb_id+'" target="_blank">'+m.tmdb_id+'</a></td></tr>';
       });
       html += '</tbody></table>';
     }
@@ -768,6 +786,23 @@ document.addEventListener('DOMContentLoaded', function(){
   document.querySelector('#page-movies th[data-col="imdb_rating"]').classList.add('sorted-desc');
   // 默认加载电影列表
   loadMovies(1);
+
+  // 加载合集数量
+  fetch('/api/collections').then(function(r){return r.json();}).then(function(d){
+    var count = d.total || 0;
+    document.getElementById('collectionCount').textContent = count;
+    document.getElementById('navCollectionCount').textContent = count;
+  });
+
+  // 加载 Top 250 已收录数
+  fetch('/api/top250?type=douban').then(function(r){return r.json();}).then(function(d){
+    var owned = (d.movies||[]).filter(function(m){return m.in_emby;}).length;
+    document.getElementById('navDoubanCount').textContent = owned;
+  });
+  fetch('/api/top250?type=imdb').then(function(r){return r.json();}).then(function(d){
+    var owned = (d.movies||[]).filter(function(m){return m.in_emby;}).length;
+    document.getElementById('navImdbCount').textContent = owned;
+  });
 });
 </script>
 </body>

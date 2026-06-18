@@ -86,6 +86,7 @@ CREATE TABLE IF NOT EXISTS emby_collections (
     total_count INT DEFAULT 0 COMMENT 'TMDB 中的电影总数',
     missing_count INT DEFAULT 0 COMMENT '未收录电影数',
     overview TEXT COMMENT '简介',
+    poster_url VARCHAR(500) COMMENT '合集海报 URL',
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uk_emby_id (emby_id),
     INDEX idx_tmdb_id (tmdb_id)
@@ -113,6 +114,7 @@ CREATE TABLE IF NOT EXISTS emby_collection_movies (
     size BIGINT COMMENT '文件大小',
     video_resolution VARCHAR(20) COMMENT '分辨率',
     path TEXT COMMENT '文件路径',
+    poster_url VARCHAR(500) COMMENT '电影海报 URL',
     in_emby TINYINT(1) DEFAULT 0 COMMENT '是否在 Emby 中',
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_collection (collection_id),

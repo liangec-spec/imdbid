@@ -97,7 +97,7 @@ def get_tmdb_collection_movies(tmdb_id):
     """从 TMDB 获取合集完整电影列表"""
     # 验证 tmdb_id 是数字
     if not tmdb_id or not tmdb_id.isdigit():
-        return []
+        return [], None
 
     resp = requests.get(
         f"https://api.themoviedb.org/3/collection/{tmdb_id}",
@@ -105,12 +105,17 @@ def get_tmdb_collection_movies(tmdb_id):
         timeout=15,
     )
     if resp.status_code == 404:
-        return []
+        return [], None
     resp.raise_for_status()
     data = resp.json()
 
+    # 合集海报
+    poster_path = data.get("poster_path", "")
+    poster_url = f"https://image.tmdb.org/t/p/w300{poster_path}" if poster_path else None
+
     movies = []
     for part in data.get("parts", []):
+        part_poster = part.get("poster_path", "")
         movies.append({
             "tmdb_id": str(part.get("id", "")),
             "name": part.get("title", ""),
@@ -118,9 +123,10 @@ def get_tmdb_collection_movies(tmdb_id):
             "year": int(part.get("release_date", "")[:4]) if part.get("release_date") else None,
             "rating": part.get("vote_average"),
             "overview": part.get("overview", ""),
+            "poster_url": f"https://image.tmdb.org/t/p/w300{part_poster}" if part_poster else "",
             "in_emby": False,
         })
-    return movies
+    return movies, poster_url
 
 
 def sync_collections():
@@ -154,9 +160,10 @@ def sync_collections():
 
                 # 获取 TMDB 完整列表
                 tmdb_movies = []
+                collection_poster = None
                 if tmdb_id:
                     try:
-                        tmdb_movies = get_tmdb_collection_movies(tmdb_id)
+                        tmdb_movies, collection_poster = get_tmdb_collection_movies(tmdb_id)
                     except Exception as e:
                         print(f"  TMDB API 错误: {e}")
 
@@ -174,10 +181,10 @@ def sync_collections():
                 # 插入合集
                 cur.execute(
                     """INSERT INTO emby_collections
-                    (emby_id, name, tmdb_id, child_count, total_count, missing_count, overview)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)""",
+                    (emby_id, name, tmdb_id, child_count, total_count, missing_count, overview, poster_url)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
                     (emby_id, col["name"], tmdb_id, col["child_count"],
-                     len(tmdb_movies), missing_count, col["overview"])
+                     len(tmdb_movies), missing_count, col["overview"], collection_poster)
                 )
                 collection_db_id = cur.lastrowid
 
@@ -192,14 +199,14 @@ def sync_collections():
                         (collection_id, tmdb_id, name, original_title, year, rating,
                          imdb_rating, imdb_votes, imdb_id, overview, genres, directors,
                          actors, studios, video_codec, audio_codec, size, video_resolution,
-                         path, in_emby)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                         path, in_emby, poster_url)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
                         (collection_db_id, m.get("tmdb_id"), m.get("name"), m.get("original_title"),
                          m.get("year"), m.get("rating"), m.get("imdb_rating"), m.get("imdb_votes"),
                          m.get("imdb_id"), m.get("overview"), m.get("genres"), m.get("directors"),
                          m.get("actors"), m.get("studios"), m.get("video_codec"), m.get("audio_codec"),
                          m.get("size"), m.get("video_resolution"), m.get("path"),
-                         1 if m.get("in_emby") else 0)
+                         1 if m.get("in_emby") else 0, m.get("poster_url"))
                     )
 
                 print(f"  已收录: {len(emby_movies)}, 未收录: {missing_count}")
