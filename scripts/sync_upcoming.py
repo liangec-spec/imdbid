@@ -60,23 +60,24 @@ def fetch_upcoming(region, limit=50):
     return all_movies[:limit]
 
 
-def save_to_db(region, movies):
+def save_to_db(category, region, movies):
     """保存到数据库"""
     conn = pymysql.connect(**DB_CONFIG)
     try:
         with conn.cursor() as cur:
-            # 删除该地区的旧数据
-            cur.execute("DELETE FROM upcoming_movies WHERE region = %s", (region,))
+            # 删除该类别/地区的旧数据
+            cur.execute("DELETE FROM upcoming_movies WHERE region = %s AND category = %s", (region, category))
             deleted = cur.rowcount
 
             # 插入新数据
             sql = """
                 INSERT INTO upcoming_movies
-                (region, tmdb_id, title, original_title, release_date, rating, popularity, overview, poster_url)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                (category, region, tmdb_id, title, original_title, release_date, rating, popularity, overview, poster_url)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
             for m in movies:
                 cur.execute(sql, (
+                    category,
                     region,
                     m["tmdb_id"],
                     m["title"],
@@ -89,24 +90,71 @@ def save_to_db(region, movies):
                 ))
 
             conn.commit()
-            print(f"  {region}: 删除 {deleted} 条，插入 {len(movies)} 条")
+            print(f"  {region}/{category}: 删除 {deleted} 条，插入 {len(movies)} 条")
     finally:
         conn.close()
 
 
+def fetch_now_playing(region, limit=50):
+    """从 TMDB 获取正在上映电影"""
+    params = {
+        "api_key": TMDB_API_KEY,
+        "language": "zh-CN",
+        "region": region,
+    }
+
+    all_movies = []
+    for page in range(1, 4):
+        params["page"] = page
+        resp = requests.get(
+            "https://api.themoviedb.org/3/movie/now_playing",
+            params=params,
+            timeout=15,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        for m in data.get("results", []):
+            poster_path = m.get("poster_path", "")
+            all_movies.append({
+                "tmdb_id": str(m.get("id", "")),
+                "title": m.get("title", ""),
+                "original_title": m.get("original_title", ""),
+                "release_date": m.get("release_date") or None,
+                "rating": m.get("vote_average", 0),
+                "popularity": m.get("popularity", 0),
+                "overview": m.get("overview", ""),
+                "poster_url": f"https://image.tmdb.org/t/p/w300{poster_path}" if poster_path else "",
+            })
+        if len(data.get("results", [])) < 20:
+            break
+
+    # 按热度排序
+    all_movies.sort(key=lambda x: x.get("popularity", 0), reverse=True)
+    return all_movies[:limit]
+
+
 def sync_upcoming():
-    """同步即将上映电影"""
+    """同步即将上映和正在上映电影"""
     if not TMDB_API_KEY:
         print("错误：未配置 TMDB API Key")
         return
 
-    print("同步即将上映电影...")
+    print("同步电影数据...")
 
     for region in ["CN", "US"]:
+        # 即将上映
         print(f"\n获取 {region} 即将上映电影...")
         try:
             movies = fetch_upcoming(region, limit=50)
-            save_to_db(region, movies)
+            save_to_db("upcoming", region, movies)
+        except Exception as e:
+            print(f"  {region} 同步失败: {e}")
+
+        # 正在上映
+        print(f"\n获取 {region} 正在上映电影...")
+        try:
+            movies = fetch_now_playing(region, limit=50)
+            save_to_db("now_playing", region, movies)
         except Exception as e:
             print(f"  {region} 同步失败: {e}")
 

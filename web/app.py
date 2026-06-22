@@ -435,18 +435,21 @@ def update_collections():
 
 @app.route("/api/upcoming")
 def api_upcoming():
-    """从数据库获取即将上映电影"""
+    """从数据库获取即将/正在上映电影"""
     region = request.args.get("region", "CN", type=str)
+    category = request.args.get("category", "upcoming", type=str)
     limit = request.args.get("limit", 50, type=int)
 
-    movies = query("""
+    order = "release_date ASC" if category == "upcoming" else "popularity DESC"
+
+    movies = query(f"""
         SELECT tmdb_id, title, original_title, release_date,
                rating, popularity, overview, poster_url
         FROM upcoming_movies
-        WHERE region = %s
-        ORDER BY release_date ASC
+        WHERE region = %s AND category = %s
+        ORDER BY {order}
         LIMIT %s
-    """, (region, limit))
+    """, (region, category, limit))
 
     # 转换类型
     for m in movies:

@@ -168,6 +168,9 @@ a:hover { text-decoration:underline; }
       <span class="icon">📙</span><span>IMDB Top 250</span>
       <span class="badge" id="navImdbCount">-</span>
     </div>
+    <div class="nav-item" onclick="switchPage('nowplaying')">
+      <span class="icon">🎥</span><span>正在上映</span>
+    </div>
     <div class="nav-item" onclick="switchPage('upcoming')">
       <span class="icon">📅</span><span>即将上映</span>
     </div>
@@ -323,6 +326,23 @@ a:hover { text-decoration:underline; }
       </div>
     </div>
 
+    <!-- 正在上映页 -->
+    <div class="page" id="page-nowplaying">
+      <div class="toolbar">
+        <span class="count-info" id="nowplayingCount">加载中...</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+        <div>
+          <h3 style="margin-bottom:12px;font-size:16px">🇨🇳 中国</h3>
+          <div id="nowplayingCN" class="upcoming-grid"></div>
+        </div>
+        <div>
+          <h3 style="margin-bottom:12px;font-size:16px">🇺🇸 美国</h3>
+          <div id="nowplayingUS" class="upcoming-grid"></div>
+        </div>
+      </div>
+    </div>
+
     <!-- 即将上映页 -->
     <div class="page" id="page-upcoming">
       <div class="toolbar">
@@ -394,13 +414,14 @@ function switchPage(name) {
   document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active'); });
   event.currentTarget.classList.add('active');
   document.getElementById('page-' + name).classList.add('active');
-  var titles = {overview:'概览',movies:'电影',douban:'豆瓣 Top 250',imdb:'IMDB Top 250',collections:'合集',upcoming:'即将上映'};
+  var titles = {overview:'概览',movies:'电影',douban:'豆瓣 Top 250',imdb:'IMDB Top 250',collections:'合集',nowplaying:'正在上映',upcoming:'即将上映'};
   document.getElementById('pageTitle').textContent = titles[name] || name;
 
   if (name === 'movies') loadMovies(1);
   if (name === 'douban') loadDouban();
   if (name === 'imdb' && !imdbData.length) loadImdb();
   if (name === 'collections' && !collectionData.length) loadCollections();
+  if (name === 'nowplaying') loadNowPlaying();
   if (name === 'upcoming') loadUpcoming();
 }
 
@@ -748,24 +769,27 @@ function pollStatus(type) {
 }
 function showStatus(type,msg) { document.getElementById('statusBar').innerHTML='<span class="status-msg status-'+type+'">'+msg+'</span>'; }
 
-// ===== 即将上映 =====
-function loadUpcoming() {
-  document.getElementById('upcomingCount').textContent = '加载中...';
+// ===== 即将/正在上映 =====
+function loadMovieList(category, countId, cnId, usId) {
+  document.getElementById(countId).textContent = '加载中...';
   Promise.all([
-    fetch('/api/upcoming?region=CN&limit=50').then(function(r){return r.json();}),
-    fetch('/api/upcoming?region=US&limit=50').then(function(r){return r.json();})
+    fetch('/api/upcoming?region=CN&category=' + category + '&limit=50').then(function(r){return r.json();}),
+    fetch('/api/upcoming?region=US&category=' + category + '&limit=50').then(function(r){return r.json();})
   ]).then(function(results){
-    renderUpcoming('upcomingCN', results[0].movies || []);
-    renderUpcoming('upcomingUS', results[1].movies || []);
-    document.getElementById('upcomingCount').textContent = '中国 ' + (results[0].movies||[]).length + ' 部 | 美国 ' + (results[1].movies||[]).length + ' 部';
+    renderMovieCards(cnId, results[0].movies || []);
+    renderMovieCards(usId, results[1].movies || []);
+    document.getElementById(countId).textContent = '中国 ' + (results[0].movies||[]).length + ' 部 | 美国 ' + (results[1].movies||[]).length + ' 部';
   }).catch(function(e){
-    document.getElementById('upcomingCount').textContent = '加载失败: ' + e;
+    document.getElementById(countId).textContent = '加载失败: ' + e;
   });
 }
-function renderUpcoming(containerId, movies) {
+function loadNowPlaying() { loadMovieList('now_playing', 'nowplayingCount', 'nowplayingCN', 'nowplayingUS'); }
+function loadUpcoming() { loadMovieList('upcoming', 'upcomingCount', 'upcomingCN', 'upcomingUS'); }
+
+function renderMovieCards(containerId, movies) {
   var container = document.getElementById(containerId);
   container.innerHTML = movies.map(function(m){
-    var poster = m.poster ? '<img class="upcoming-poster" src="' + m.poster + '" alt="" loading="lazy">' : '<div class="upcoming-poster"></div>';
+    var poster = m.poster_url ? '<img class="upcoming-poster" src="/api/poster/' + m.poster_url + '" alt="" loading="lazy">' : '<div class="upcoming-poster"></div>';
     var date = m.release_date || '-';
     var rating = m.rating > 0 ? '⭐ ' + parseFloat(m.rating).toFixed(1) : '';
     return '<div class="upcoming-card">' +
