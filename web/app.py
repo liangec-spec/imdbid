@@ -480,9 +480,34 @@ def get_status():
         return jsonify(task_status)
 
 
+POSTER_CACHE_DIR = os.path.join(DATA_DIR, "posters")
+
+
+def _get_poster_cache_path(url):
+    """生成缓存文件路径"""
+    import hashlib
+    url_hash = hashlib.md5(url.encode()).hexdigest()
+    ext = ".jpg"
+    if ".png" in url:
+        ext = ".png"
+    return os.path.join(POSTER_CACHE_DIR, f"{url_hash}{ext}")
+
+
+def _cleanup_poster_cache():
+    """清理超过 30 天的缓存图片"""
+    if not os.path.exists(POSTER_CACHE_DIR):
+        return
+    import time
+    now = time.time()
+    for f in os.listdir(POSTER_CACHE_DIR):
+        path = os.path.join(POSTER_CACHE_DIR, f)
+        if os.path.isfile(path) and (now - os.path.getmtime(path)) > 30 * 86400:
+            os.remove(path)
+
+
 @app.route("/api/poster/<path:encoded_url>")
 def api_poster(encoded_url):
-    """图片代理：Base64 编码的 URL"""
+    """图片代理：Base64 编码的 URL，带本地缓存"""
     import base64
     try:
         url = base64.urlsafe_b64decode(encoded_url + "==").decode("utf-8")
@@ -498,10 +523,27 @@ def api_poster(encoded_url):
     if not any(url.startswith(a) for a in allowed):
         return "Invalid URL", 403
 
+    # 检查本地缓存
+    cache_path = _get_poster_cache_path(url)
+    if os.path.exists(cache_path):
+        with open(cache_path, "rb") as f:
+            content = f.read()
+        ct = "image/png" if cache_path.endswith(".png") else "image/jpeg"
+        return content, 200, {"Content-Type": ct}
+
+    # 从远程下载
     try:
         resp = requests.get(url, timeout=10)
         resp.raise_for_status()
-        return resp.content, 200, {"Content-Type": resp.headers.get("Content-Type", "image/jpeg")}
+        content = resp.content
+
+        # 保存到缓存
+        os.makedirs(POSTER_CACHE_DIR, exist_ok=True)
+        with open(cache_path, "wb") as f:
+            f.write(content)
+
+        ct = resp.headers.get("Content-Type", "image/jpeg")
+        return content, 200, {"Content-Type": ct}
     except Exception:
         return "", 502
 
@@ -574,8 +616,9 @@ def api_collection_detail(collection_id):
     })
 
 
-# 启动时同步映射数据（Gunicorn 和直接运行都会执行）
+# 启动时同步映射数据和清理缓存（Gunicorn 和直接运行都会执行）
 sync_mapping_to_db()
+_cleanup_poster_cache()
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=False)
