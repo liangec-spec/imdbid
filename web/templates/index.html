@@ -674,7 +674,7 @@ function renderCollectionsPage() {
   page.forEach(function(c,i){
     var owned = (c.total_count||0) - (c.missing_count||0);
     var status = c.total_count>0?(c.missing_count===0?'<span class="badge badge-green">✓ 全部收录 ('+owned+')</span>':'<span style="color:var(--green)">'+owned+'</span> / <span style="color:var(--red)">'+c.missing_count+' 未收录</span>'):'-';
-    var posterHtml = c.poster_url ? '<img class="poster-thumb" src="'+c.poster_url+'" loading="lazy" alt="">' : '';
+    var posterHtml = c.poster_url ? '<img class="poster-thumb" src="/api/poster/' + btoa(c.poster_url).replace(/=/g,'') + '">' : '';
     var tr = document.createElement('tr');
     tr.className = 'clickable-row';
     tr.onclick = function(){ toggleCollection(c.id, this); };
@@ -789,7 +789,7 @@ function loadUpcoming() { loadMovieList('upcoming', 'upcomingCount', 'upcomingCN
 function renderMovieCards(containerId, movies) {
   var container = document.getElementById(containerId);
   container.innerHTML = movies.map(function(m){
-    var poster = m.poster_url ? '<img class="upcoming-poster" src="/api/poster/' + m.poster_url + '" alt="" loading="lazy">' : '<div class="upcoming-poster"></div>';
+    var poster = m.poster_url ? '<img class="upcoming-poster" src="/api/poster/' + btoa(m.poster_url).replace(/=/g,'') + '" alt="" loading="lazy">' : '<div class="upcoming-poster"></div>';
     var date = m.release_date || '-';
     var rating = m.rating > 0 ? '⭐ ' + parseFloat(m.rating).toFixed(1) : '';
     return '<div class="upcoming-card">' +
