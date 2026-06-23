@@ -788,8 +788,9 @@ function loadUpcoming() { loadMovieList('upcoming', 'upcomingCount', 'upcomingCN
 
 function renderMovieCards(containerId, movies) {
   var container = document.getElementById(containerId);
-  container.innerHTML = movies.map(function(m){
-    var poster = m.poster_url ? '<img class="upcoming-poster" src="/api/poster/' + btoa(m.poster_url).replace(/=/g,'') + '" alt="" loading="lazy">' : '<div class="upcoming-poster"></div>';
+  // 先渲染无图片版本，然后延迟加载图片
+  container.innerHTML = movies.map(function(m, i){
+    var poster = '<div class="upcoming-poster" data-src="' + (m.poster_url ? '/api/poster/' + btoa(m.poster_url).replace(/=/g,'') : '') + '"></div>';
     var date = m.release_date || '-';
     var rating = m.rating > 0 ? '⭐ ' + parseFloat(m.rating).toFixed(1) : '';
     return '<div class="upcoming-card">' +
@@ -800,6 +801,29 @@ function renderMovieCards(containerId, movies) {
       '<div class="upcoming-overview">' + (m.overview || '-') + '</div>' +
       '</div></div>';
   }).join('');
+  // 延迟加载图片（每张间隔 200ms，避免并发过多）
+  lazyLoadPosters(container);
+}
+
+function lazyLoadPosters(container) {
+  var posters = container.querySelectorAll('.upcoming-poster[data-src]');
+  var i = 0;
+  function loadNext() {
+    if (i >= posters.length) return;
+    var el = posters[i];
+    var src = el.getAttribute('data-src');
+    if (src) {
+      var img = document.createElement('img');
+      img.className = 'upcoming-poster';
+      img.src = src;
+      img.alt = '';
+      img.loading = 'lazy';
+      el.parentNode.replaceChild(img, el);
+    }
+    i++;
+    setTimeout(loadNext, 200);  // 每张间隔 200ms
+  }
+  loadNext();
 }
 
 // ===== 初始化 =====
