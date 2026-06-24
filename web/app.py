@@ -11,12 +11,12 @@ from datetime import datetime
 
 import requests
 from flask import Flask, render_template, jsonify, request
-import pymysql
-
 # 添加项目根目录到 path
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
 from config import DB_CONFIG, DATA_DIR, EMBY_CONFIG, TMDB_API_KEY
+from scripts import db
+from scripts.movie_utils import build_poster_url
 
 app = Flask(__name__)
 
@@ -40,31 +40,42 @@ task_status = {"emby": None, "imdb": None, "douban": None, "collections": None, 
 status_lock = threading.Lock()
 
 
-def query(sql, args=None):
-    conn = pymysql.connect(**DB_CONFIG)
-    try:
-        with conn.cursor(pymysql.cursors.DictCursor) as cur:
-            cur.execute(sql, args)
-            return cur.fetchall()
-    finally:
-        conn.close()
-
-
-def execute(sql, args=None):
-    conn = pymysql.connect(**DB_CONFIG)
-    try:
-        with conn.cursor() as cur:
-            cur.execute(sql, args)
-            conn.commit()
-            return cur.rowcount
-    finally:
-        conn.close()
-
 
 def update_status(task_name, status, message):
     with status_lock:
-        task_status[task_name] = {"status": status, "message": message}
+        if task_status[task_name] is None:
+            task_status[task_name] = {"log": ""}
+        task_status[task_name]["status"] = status
+        task_status[task_name]["message"] = message
 
+
+def append_log(task_name, text):
+    with status_lock:
+        if task_status[task_name] is None:
+            task_status[task_name] = {"log": ""}
+        task_status[task_name]["log"] += text
+
+
+def run_task(task_name, cmd, cwd=None):
+    from datetime import datetime
+    update_status(task_name, "running", "执行中...")
+    append_log(task_name, "[%s] 启动\n" % datetime.now().strftime("%H:%M:%S"))
+    try:
+        env = dict(os.environ, PYTHONUNBUFFERED="1")
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, cwd=cwd, env=env, bufsize=1)
+        for line in iter(proc.stdout.readline, ""):
+            if line:
+                append_log(task_name, line)
+        proc.wait()
+        if proc.returncode == 0:
+            update_status(task_name, "done", "完成")
+            append_log(task_name, "完成\n")
+        else:
+            update_status(task_name, "error", "脚本执行失败")
+            append_log(task_name, "失败\n")
+    except Exception as e:
+        update_status(task_name, "error", str(e))
+        append_log(task_name, "异常: %s\n" % e)
 
 def run_task(task_name, cmd, cwd=None):
     update_status(task_name, "running", "执行中...")
@@ -107,9 +118,9 @@ def save_mapping(data):
 def sync_mapping_to_db():
     data = load_mapping()
     mappings = data.get("mappings", {})
-    execute("DELETE FROM douban_imdb_mapping")
+    db.execute("DELETE FROM douban_imdb_mapping")
     if mappings:
-        conn = pymysql.connect(**DB_CONFIG)
+        conn = db.get_connection()
         try:
             with conn.cursor() as cur:
                 for douban_id, info in mappings.items():
@@ -129,11 +140,11 @@ def sync_mapping_to_db():
 
 @app.route("/")
 def index():
-    douban_total = query("SELECT COUNT(*) AS c FROM douban_top250")[0]["c"]
-    imdb_total = query("SELECT COUNT(*) AS c FROM imdb_top250")[0]["c"]
-    emby_total = query("SELECT COUNT(*) AS c FROM emby_movies")[0]["c"]
+    douban_total = db.query("SELECT COUNT(*) AS c FROM douban_top250")[0]["c"]
+    imdb_total = db.query("SELECT COUNT(*) AS c FROM imdb_top250")[0]["c"]
+    emby_total = db.query("SELECT COUNT(*) AS c FROM emby_movies")[0]["c"]
 
-    douban_missing_count = query("""
+    douban_missing_count = db.query("""
         SELECT COUNT(*) AS c FROM douban_top250 m
         WHERE NOT EXISTS (
             SELECT 1 FROM emby_movies e
@@ -144,7 +155,7 @@ def index():
         )
     """)[0]["c"]
 
-    imdb_missing_count = query("""
+    imdb_missing_count = db.query("""
         SELECT COUNT(*) AS c FROM imdb_top250 i
         WHERE i.imdb_id NOT IN (SELECT imdb_id FROM emby_movies WHERE imdb_id IS NOT NULL AND imdb_id != '')
     """)[0]["c"]
@@ -188,7 +199,7 @@ def api_movies():
     if filter_type in ("imdb", "both"):
         imdb_join = "INNER JOIN imdb_top250 i ON e.imdb_id = i.imdb_id"
     else:
-        imdb_join = "LEFT JOIN imdb_top250 i ON e.imdb_id = i.imdb_id"
+        imdb_join = "LEFT JOIN imdb_top250 i ON e.imdb_id = i.imdb_id LEFT JOIN (SELECT imdb_id, ROW_NUMBER() OVER (ORDER BY id) AS ranking FROM imdb_top250) ir ON e.imdb_id = ir.imdb_id"
 
     douban_filter = ""
     if filter_type in ("douban", "both"):
@@ -200,7 +211,7 @@ def api_movies():
         )"""
 
     count_sql = f"SELECT COUNT(*) AS total FROM emby_movies e {imdb_join} WHERE {where_sql} {douban_filter}"
-    total = query(count_sql, params)[0]["total"]
+    total = db.query(count_sql, params)[0]["total"]
 
     offset = (page - 1) * per_page
     data_sql = f"""
@@ -218,7 +229,7 @@ def api_movies():
                 ELSE IFNULL(e.video_resolution, '-')
             END AS resolution_label,
             SUBSTRING_INDEX(SUBSTRING_INDEX(e.path, '\\\\', 4), '\\\\', -1) AS location,
-            CASE WHEN i.id IS NOT NULL THEN (SELECT COUNT(*)+1 FROM imdb_top250 i2 WHERE i2.id < i.id) ELSE NULL END AS imdb_rank,
+            ir.ranking AS imdb_rank,
             CASE WHEN EXISTS (
                 SELECT 1 FROM douban_top250 d
                 LEFT JOIN douban_imdb_mapping map ON d.douban_id = map.douban_id
@@ -235,7 +246,7 @@ def api_movies():
         ORDER BY {order_field} {order_dir}
         LIMIT %s OFFSET %s
     """
-    movies = query(data_sql, params + [per_page, offset])
+    movies = db.query(data_sql, params + [per_page, offset])
     # 格式化日期字段
     for m in movies:
         for key in ("date_added", "date_modified", "release_date"):
@@ -252,7 +263,7 @@ def api_movies():
 def api_missing_movies():
     type = request.args.get("type", "imdb", type=str)
     if type == "douban":
-        movies = query("""
+        movies = db.query("""
             SELECT m.ranking, m.title, m.douban_id, m.imdb_id, m.douban_link
             FROM douban_top250 m
             WHERE NOT EXISTS (
@@ -265,7 +276,7 @@ def api_missing_movies():
             ORDER BY m.ranking
         """)
     else:
-        movies = query("""
+        movies = db.query("""
             SELECT i.imdb_id, i.title FROM imdb_top250 i
             WHERE i.imdb_id NOT IN (SELECT imdb_id FROM emby_movies WHERE imdb_id IS NOT NULL AND imdb_id != '')
             ORDER BY i.id
@@ -277,7 +288,7 @@ def api_missing_movies():
 def api_top250():
     type = request.args.get("type", "imdb", type=str)
     if type == "douban":
-        movies = query("""
+        movies = db.query("""
             SELECT
                 m.ranking, m.title, m.douban_id, m.douban_link,
                 CASE
@@ -306,7 +317,7 @@ def api_top250():
             ORDER BY m.ranking
         """)
     else:
-        rows = query("""
+        rows = db.query("""
             SELECT
                 ROW_NUMBER() OVER (ORDER BY i.id) AS `rank`,
                 i.title, i.imdb_id, e.year,
@@ -361,10 +372,10 @@ def api_mapping_save():
     save_mapping(data)
 
     # 查找 ranking
-    row = query("SELECT ranking FROM douban_top250 WHERE douban_id = %s", (douban_id,))
+    row = db.query("SELECT ranking FROM douban_top250 WHERE douban_id = %s", (douban_id,))
     ranking = row[0]["ranking"] if row else 0
 
-    execute("""
+    db.execute("""
         INSERT INTO douban_imdb_mapping (douban_id, douban_ranking, douban_title, imdb_id, note)
         VALUES (%s, %s, %s, %s, %s)
         ON DUPLICATE KEY UPDATE imdb_id = VALUES(imdb_id), note = VALUES(note)
@@ -379,7 +390,7 @@ def api_mapping_delete(douban_id):
     if douban_id in data["mappings"]:
         del data["mappings"][douban_id]
         save_mapping(data)
-    execute("DELETE FROM douban_imdb_mapping WHERE douban_id = %s", (douban_id,))
+    db.execute("DELETE FROM douban_imdb_mapping WHERE douban_id = %s", (douban_id,))
     return jsonify({"status": "ok", "message": "删除成功"})
 
 
@@ -440,9 +451,12 @@ def api_upcoming():
     category = request.args.get("category", "upcoming", type=str)
     limit = request.args.get("limit", 50, type=int)
 
-    order = "release_date ASC" if category == "upcoming" else "popularity DESC"
+    from web.safe_order import UPCOMING_ORDER_MAP
+    order = UPCOMING_ORDER_MAP.get(category)
+    if not order:
+        return jsonify({"error": "无效的 category 参数"}), 400
 
-    movies = query(f"""
+    movies = db.query(f"""
         SELECT tmdb_id, title, original_title, release_date,
                rating, popularity, overview, poster_url
         FROM upcoming_movies
@@ -476,7 +490,13 @@ def update_upcoming():
 
 @app.route("/api/status")
 def get_status():
+    task_name = request.args.get("task")
     with status_lock:
+        if task_name:
+            info = task_status.get(task_name)
+            if info is None:
+                return jsonify({"log": ""})
+            return jsonify({"log": info.get("log", "")})
         return jsonify(task_status)
 
 
@@ -516,8 +536,16 @@ def api_poster(encoded_url):
 
     # 安全检查：只允许 Emby 服务器的图片
     emby_server = EMBY_CONFIG.get("server", "")
-    if not emby_server or not url.startswith(emby_server):
+    from urllib.parse import urlparse
+    if not emby_server:
         return "Invalid URL", 403
+    try:
+        allowed = urlparse(emby_server)
+        target = urlparse(url)
+        if (target.scheme, target.netloc) != (allowed.scheme, allowed.netloc):
+            return "Invalid URL", 403
+    except Exception:
+        return "Invalid URL", 400
 
     # 检查本地缓存
     cache_path = _get_poster_cache_path(url)
@@ -549,7 +577,7 @@ def api_poster(encoded_url):
 @app.route("/api/collections")
 def api_collections():
     """从数据库获取合集列表"""
-    rows = query("""
+    rows = db.query("""
         SELECT id, emby_id, name, tmdb_id, child_count, total_count, missing_count, overview, poster_url
         FROM emby_collections
         ORDER BY name
@@ -560,7 +588,7 @@ def api_collections():
 @app.route("/api/collections/<int:collection_id>")
 def api_collection_detail(collection_id):
     """从数据库获取合集内的电影，关联 emby_movies 获取完整信息"""
-    movies = query("""
+    movies = db.query("""
         SELECT c.name, c.original_title, c.year, c.rating, c.imdb_rating, c.imdb_votes,
                c.imdb_id, c.tmdb_id, c.overview, c.genres, c.directors, c.actors, c.studios,
                c.video_codec, c.audio_codec, c.size, c.video_resolution, c.path, c.in_emby,
@@ -581,7 +609,7 @@ def api_collection_detail(collection_id):
             m["imdb_votes"] = m["emby_imdb_votes"]
         # 从 emby_movies 补充 poster_url
         if not m.get("poster_url") and m.get("imdb_id"):
-            emby = query("SELECT poster_url FROM emby_movies WHERE imdb_id = %s", (m["imdb_id"],))
+            emby = db.query("SELECT poster_url FROM emby_movies WHERE imdb_id = %s", (m["imdb_id"],))
             if emby and emby[0].get("poster_url"):
                 m["poster_url"] = emby[0]["poster_url"]
 
@@ -598,8 +626,9 @@ def api_collection_detail(collection_id):
 
         # 提取位置
         if path:
-            parts = path.split("\\")
-            m["location"] = parts[3] if len(parts) > 3 else "-"
+            normalized = path.replace("\\", "/")
+            parts = [p for p in normalized.split("/") if p]
+            m["location"] = parts[3] if len(parts) > 3 else parts[0] if parts else "-"
         else:
             m["location"] = "-"
 
@@ -613,8 +642,19 @@ def api_collection_detail(collection_id):
 
 
 # 启动时同步映射数据和清理缓存（Gunicorn 和直接运行都会执行）
-sync_mapping_to_db()
-_cleanup_poster_cache()
+_app_initialized = False
+
+@app.before_request
+def _init_app():
+    global _app_initialized
+    if not _app_initialized:
+        _app_initialized = True
+        try:
+            sync_mapping_to_db()
+            _cleanup_poster_cache()
+        except Exception as e:
+            print(f"[启动] 初始化失败: {e}")
+            _app_initialized = False
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=False)

@@ -16,8 +16,7 @@ import requests
 # 添加项目根目录到 path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import DB_CONFIG, DATA_DIR
-
-import pymysql
+from scripts import db
 
 BASE_URL = "https://movie.douban.com/top250"
 
@@ -81,10 +80,6 @@ def extract_douban_id(link):
     """从豆瓣链接提取 subject ID"""
     match = re.search(r"/subject/(\d+)", link)
     return match.group(1) if match else ""
-
-def extract_douban_id_from_link(link):
-    """从豆瓣链接提取 subject ID（别名）"""
-    return extract_douban_id(link)
 
 
 def get_douban_info(douban_id):
@@ -190,7 +185,7 @@ def save_to_csv(movies, filename):
 
 def save_to_mysql(movies):
     """写入 MySQL"""
-    conn = pymysql.connect(**DB_CONFIG)
+    conn = db.get_connection()
     try:
         with conn.cursor() as cur:
             cur.execute("DELETE FROM douban_top250")
@@ -203,6 +198,10 @@ def save_to_mysql(movies):
 
             conn.commit()
             print(f"MySQL: 删除旧记录 {deleted} 条，插入新记录 {len(movies)} 条")
+    except Exception as e:
+        conn.rollback()
+        print(f"MySQL: 写入失败，已回滚: {e}")
+        raise
     finally:
         conn.close()
 

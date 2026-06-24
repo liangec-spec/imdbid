@@ -32,3 +32,9 @@ secrets/
 # OS 文件
 .DS_Store
 Thumbs.db
+
+# 缓存和备份
+backups/
+data/posters/
+
+# 优化方案文档
