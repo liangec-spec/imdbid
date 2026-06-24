@@ -9,6 +9,7 @@
 - **豆瓣 Top 250 对比** - 自动检测缺失电影
 - **IMDB 评分获取** - 从 IMDB 公开数据集批量获取评分（匹配率 99.9%）
 - **电影合集管理** - 展示 Emby 合集，显示未收录电影（基于 TMDB）
+- **即将/正在上映** - 中国/美国各 50 部电影
 - **Web 管理界面** - 搜索、筛选、排序、分页、主题切换
 - **Docker 部署** - 一键部署到生产环境
 
@@ -23,13 +24,16 @@ imdbid/
 │   ├── fetch_imdb_top250.py    # IMDB Top 250 获取
 │   ├── fetch_douban_top250.py  # 豆瓣 Top 250 爬虫
 │   ├── import_douban.py        # 豆瓣数据导入
-│   └── sync_collections.py     # 电影合集同步
+│   ├── sync_collections.py     # 电影合集同步
+│   └── sync_upcoming.py        # 即将/正在上映同步
 ├── web/                        # Web 管理界面
 │   ├── app.py
 │   └── templates/
 │       └── index.html
 ├── sql/                        # 数据库脚本
 │   └── schema.sql
+├── data/                       # 数据文件（Git 忽略）
+│   └── posters/                # 图片缓存
 ├── .github/workflows/          # GitHub Actions
 │   └── docker.yml              # Docker 自动构建
 ├── Dockerfile                  # Docker 镜像构建
@@ -53,36 +57,37 @@ docker pull liangec/emby-movies:latest
 #### 2. 配置环境变量
 
 ```bash
-cat > .env << EOF
-DB_PASSWORD=your_secure_password
+cp .env.example .env
+```
+
+编辑 `.env` 文件，填入以下配置：
+
+```bash
+# 必填
 EMBY_SERVER=http://your-emby-server:8096
 EMBY_API_KEY=your-api-key
 EMBY_PARENT_ID=your-library-id
-EOF
+DB_PASSWORD=your_secure_password
+
+# 可选
+EMBY_COLLECTIONS_PARENT_ID=43626    # 合集媒体库 ID，默认 43626
+TMDB_API_KEY=your-tmdb-api-key      # 用于合集和即将上映功能
 ```
 
-#### 3. 下载配置文件
-
-```bash
-curl -O https://raw.githubusercontent.com/liangec-spec/imdbid/main/docker-compose.yml
-mkdir -p sql
-curl -o sql/schema.sql https://raw.githubusercontent.com/liangec-spec/imdbid/main/sql/schema.sql
-```
-
-#### 4. 启动服务
+#### 3. 启动服务
 
 ```bash
 docker compose up -d
 ```
 
-#### 5. 访问
+#### 4. 访问
 
 打开浏览器访问：`http://your-server:8097`
 
-#### 6. 初始化数据
+#### 5. 初始化数据
 
 ```bash
-# 导出 Emby 电影
+# 导出 Emby 电影（含 IMDB 评分）
 docker compose exec app python scripts/export_emby.py --mysql
 
 # 获取 IMDB Top 250
@@ -93,6 +98,9 @@ docker compose exec app python scripts/fetch_douban_top250.py
 
 # 同步电影合集
 docker compose exec app python scripts/sync_collections.py
+
+# 同步即将/正在上映
+docker compose exec app python scripts/sync_upcoming.py
 ```
 
 ### 方式二：本地开发
@@ -125,6 +133,7 @@ python scripts/export_emby.py --mysql
 python scripts/fetch_imdb_top250.py
 python scripts/fetch_douban_top250.py
 python scripts/sync_collections.py
+python scripts/sync_upcoming.py
 ```
 
 #### 5. 启动 Web 界面
@@ -133,6 +142,34 @@ python scripts/sync_collections.py
 python web/app.py
 # 访问 http://localhost:5000
 ```
+
+## ⚙️ 配置项说明
+
+### 环境变量
+
+| 变量 | 必填 | 默认值 | 说明 |
+| ---- | ---- | ------ | ---- |
+| `EMBY_SERVER` | ✅ | - | Emby 服务器地址 |
+| `EMBY_API_KEY` | ✅ | - | Emby API 密钥 |
+| `EMBY_PARENT_ID` | ✅ | - | 电影媒体库 ID |
+| `DB_PASSWORD` | ✅ | - | MySQL root 密码 |
+| `EMBY_COLLECTIONS_PARENT_ID` | ❌ | 43626 | 合集媒体库 ID |
+| `TMDB_API_KEY` | ❌ | - | TMDB API Key（合集和即将上映功能需要） |
+
+### 获取配置值
+
+**Emby API Key：**
+1. 打开 Emby 管理后台
+2. 设置 → API 密钥 → 创建新密钥
+
+**Emby 媒体库 ID（Parent ID）：**
+```bash
+curl -s "http://your-emby-server:8096/Library/VirtualFolders?api_key=your-api-key" | python3 -m json.tool
+```
+
+**TMDB API Key：**
+1. 访问 <https://www.themoviedb.org/settings/api>
+2. 注册账号并申请 API Key
 
 ## 🛠️ 技术栈
 
@@ -146,12 +183,13 @@ python web/app.py
 
 | 表名 | 说明 |
 | ---- | ---- |
-| emby_movies | Emby 电影数据（含 IMDB 评分） |
+| emby_movies | Emby 电影数据（含 IMDB 评分、封面 URL） |
 | imdb_top250 | IMDB Top 250 |
 | douban_top250 | 豆瓣 Top 250（含 douban_id） |
 | douban_imdb_mapping | 豆瓣-IMDB 手动关联映射 |
 | emby_collections | 电影合集 |
 | emby_collection_movies | 合集内的电影 |
+| upcoming_movies | 即将/正在上映电影 |
 
 ## 🎨 Web 界面功能
 
@@ -162,7 +200,8 @@ python web/app.py
 - 排序（名称、年份、IMDB 评分、加入日期）
 - 筛选（全部、仅 IMDB 250、仅豆瓣 250、两者都在）
 - 点击展开详情（导演、演员、简介、编码等）
-- 显示分辨率、位置、加入日期
+- 显示封面缩略图、分辨率、位置、加入日期
+- IMDB/豆瓣排名显示（前 50 加粗）
 
 ### Top 250
 
@@ -174,6 +213,14 @@ python web/app.py
 - 合集列表（分页、搜索、筛选）
 - 展开显示已收录/未收录电影
 - 未收录电影基于 TMDB 数据对比
+- 显示电影封面
+
+### 即将/正在上映
+
+- 中国/美国各 50 部电影
+- 即将上映（按上映日期排序）
+- 正在上映（按热度排序）
+- 显示电影海报
 
 ### 主题切换
 
@@ -214,9 +261,21 @@ git push origin v2.1.0
 | 标签 | 说明 |
 | ---- | ---- |
 | `liangec/emby-movies:latest` | 最新稳定版 |
-| `liangec/emby-movies:v2.2.0` | 特定版本 |
+| `liangec/emby-movies:v2.2.2` | 特定版本 |
 
 ## 📝 版本历史
+
+### v2.2.2 (2026-06-23)
+
+- 图片代理添加本地缓存
+- 图片延迟加载，避免并发过多导致 502
+- 自动清理 30 天前的缓存
+
+### v2.2.1 (2026-06-22)
+
+- 修复 cron 任务使用 python3
+- 添加正在上映页面（中国/美国各 50 部）
+- 同步脚本同时更新即将上映和正在上映
 
 ### v2.2.0 (2026-06-18)
 
@@ -231,7 +290,6 @@ git push origin v2.1.0
 - 合集管理优化
   - 合集主行显示海报
   - 合集内电影显示海报
-  - 已收录/未收录电影都有封面
 - 电影排名显示
   - IMDB/豆瓣排名数字显示（前 50 加粗）
 - 界面优化
