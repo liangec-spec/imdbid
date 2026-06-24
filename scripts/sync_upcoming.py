@@ -9,10 +9,11 @@ import json
 from datetime import datetime, timedelta
 
 import requests
-import pymysql
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import DB_CONFIG, TMDB_API_KEY
+from scripts import db
+from scripts.movie_utils import build_poster_url
 
 
 def fetch_upcoming(region, limit=50):
@@ -41,7 +42,6 @@ def fetch_upcoming(region, limit=50):
         resp.raise_for_status()
         data = resp.json()
         for m in data.get("results", []):
-            poster_path = m.get("poster_path", "")
             all_movies.append({
                 "tmdb_id": str(m.get("id", "")),
                 "title": m.get("title", ""),
@@ -50,7 +50,7 @@ def fetch_upcoming(region, limit=50):
                 "rating": m.get("vote_average", 0),
                 "popularity": m.get("popularity", 0),
                 "overview": m.get("overview", ""),
-                "poster_url": f"https://image.tmdb.org/t/p/w300{poster_path}" if poster_path else "",
+                "poster_url": build_poster_url(m.get("poster_path", "")) or "",
             })
         if len(data.get("results", [])) < 20:
             break
@@ -62,8 +62,9 @@ def fetch_upcoming(region, limit=50):
 
 def save_to_db(category, region, movies):
     """保存到数据库"""
-    conn = pymysql.connect(**DB_CONFIG)
+    conn = db.get_connection()
     try:
+        conn.begin()
         with conn.cursor() as cur:
             # 删除该类别/地区的旧数据
             cur.execute("DELETE FROM upcoming_movies WHERE region = %s AND category = %s", (region, category))
@@ -91,6 +92,10 @@ def save_to_db(category, region, movies):
 
             conn.commit()
             print(f"  {region}/{category}: 删除 {deleted} 条，插入 {len(movies)} 条")
+    except Exception as e:
+        conn.rollback()
+        print(f"  {region}/{category}: 写入失败，已回滚: {e}")
+        raise
     finally:
         conn.close()
 
@@ -114,7 +119,6 @@ def fetch_now_playing(region, limit=50):
         resp.raise_for_status()
         data = resp.json()
         for m in data.get("results", []):
-            poster_path = m.get("poster_path", "")
             all_movies.append({
                 "tmdb_id": str(m.get("id", "")),
                 "title": m.get("title", ""),
@@ -123,7 +127,7 @@ def fetch_now_playing(region, limit=50):
                 "rating": m.get("vote_average", 0),
                 "popularity": m.get("popularity", 0),
                 "overview": m.get("overview", ""),
-                "poster_url": f"https://image.tmdb.org/t/p/w300{poster_path}" if poster_path else "",
+                "poster_url": build_poster_url(m.get("poster_path", "")) or "",
             })
         if len(data.get("results", [])) < 20:
             break

@@ -11,11 +11,11 @@ import os
 import sys
 
 import requests
-import pymysql
 
 # 添加项目根目录到 path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import DB_CONFIG, IMDB_DATASETS, DATA_DIR
+from scripts import db
 
 # 最少投票数（过滤冷门电影）
 MIN_VOTES = 100000
@@ -113,8 +113,9 @@ def save_to_csv(movies, filename):
 
 def save_to_mysql(movies):
     """写入 MySQL"""
-    conn = pymysql.connect(**DB_CONFIG)
+    conn = db.get_connection()
     try:
+        conn.begin()
         with conn.cursor() as cur:
             cur.execute("DELETE FROM imdb_top250")
             deleted = cur.rowcount
@@ -125,6 +126,10 @@ def save_to_mysql(movies):
 
             conn.commit()
             print(f"MySQL: 删除旧记录 {deleted} 条，插入新记录 {len(movies)} 条")
+    except Exception as e:
+        conn.rollback()
+        print(f"MySQL: 写入失败，已回滚: {e}")
+        raise
     finally:
         conn.close()
 

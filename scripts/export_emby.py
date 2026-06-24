@@ -13,11 +13,12 @@ import argparse
 from typing import List, Dict
 
 import requests
-import pymysql
 
 # 添加项目根目录到 path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import DB_CONFIG, EMBY_CONFIG, EXPORT_FIELDS, IMDB_DATASETS, DATA_DIR
+from scripts import db
+from scripts.movie_utils import parse_emby_movie
 
 # Emby API 可获取的字段
 EMBY_API_FIELDS = [
@@ -95,77 +96,8 @@ def get_all_movies(server: str, api_key: str, parent_id: str) -> List[Dict]:
 
 
 def parse_movie(item: Dict, server: str = "") -> Dict:
-    """解析 Emby 返回的电影数据"""
-    provider_ids = item.get("ProviderIds", {})
-    media_sources = item.get("MediaSources", [{}])[0] if item.get("MediaSources") else {}
-    video_stream = next((s for s in item.get("MediaStreams", []) if s.get("Type") == "Video"), {})
-    audio_stream = next((s for s in item.get("MediaStreams", []) if s.get("Type") == "Audio"), {})
-
-    # 处理演职人员
-    people = item.get("People", [])
-    directors = [p.get("Name") for p in people if p.get("Type") == "Director"]
-    actors = [p.get("Name") for p in people if p.get("Type") == "Actor"]
-
-    # 处理国家（从 TagItems 中筛选类型为 Country 的）
-    tag_items = item.get("TagItems", [])
-    countries = [t.get("Name") for t in tag_items if t.get("Type") == "Country"]
-    tags = [t.get("Name") for t in tag_items if t.get("Type") != "Country"]
-
-    # 处理时长
-    runtime_ticks = item.get("RuntimeTicks", 0)
-    runtime_minutes = int(runtime_ticks / 600000000) if runtime_ticks else 0
-
-    # 处理日期（空字符串转为 None，否则 MySQL DATE 类型报错）
-    release_date = item.get("ReleaseDate", "")
-    release_date = release_date.split("T")[0] if release_date else None
-
-    date_created = item.get("DateCreated", "")
-    date_created = date_created.split("T")[0] if date_created else None
-
-    date_modified = item.get("DateModified", "")
-    date_modified = date_modified.split("T")[0] if date_modified else None
-
-    imdb_id = provider_ids.get("Imdb", "")
-
-    # 生成封面 URL
-    image_tags = item.get("ImageTags", {})
-    primary_tag = image_tags.get("Primary", "")
-    emby_id = item.get("Id", "")
-    poster_url = f"{server}/Items/{emby_id}/Images/Primary?tag={primary_tag}" if primary_tag and server else ""
-
-    return {
-        "title": item.get("Name", ""),
-        "original_title": item.get("OriginalTitle", ""),
-        "year": item.get("ProductionYear", ""),
-        "production_year": item.get("ProductionYear", ""),
-        "official_rating": item.get("OfficialRating", ""),
-        "imdb_id": imdb_id,
-        "imdb_url": f"https://www.imdb.com/title/{imdb_id}" if imdb_id else "",
-        "tmdb_id": provider_ids.get("Tmdb", ""),
-        "rating": item.get("CommunityRating", ""),
-        "community_rating": item.get("CommunityRating", ""),
-        "vote_count": item.get("VoteCount", ""),
-        "runtime": runtime_minutes,
-        "overview": item.get("Overview", "").replace("\n", " ").replace("\r", " "),
-        "release_date": release_date,
-        "genres": "|".join(item.get("Genres", [])),
-        "studios": "|".join([s.get("Name") for s in item.get("Studios", [])]),
-        "countries": "|".join(countries),
-        "directors": "|".join(directors),
-        "actors": "|".join(actors[:10]),
-        "path": media_sources.get("Path", ""),
-        "size": media_sources.get("Size", ""),
-        "container": media_sources.get("Container", ""),
-        "video_codec": video_stream.get("Codec", ""),
-        "audio_codec": audio_stream.get("Codec", ""),
-        "video_resolution": f"{video_stream.get('Width', '')}x{video_stream.get('Height', '')}" if video_stream.get("Width") else "",
-        "date_added": date_created,
-        "date_modified": date_modified,
-        "tags": "|".join(tags),
-        "imdb_rating": "",
-        "imdb_votes": "",
-        "poster_url": poster_url,
-    }
+    """解析 Emby 返回的电影数据（委托到共享模块）"""
+    return parse_emby_movie(item, server)
 
 
 def save_to_csv(movies: List[Dict], filename: str):
@@ -179,9 +111,10 @@ def save_to_csv(movies: List[Dict], filename: str):
 
 
 def save_to_mysql(movies: List[Dict]):
-    """写入 MySQL"""
-    conn = pymysql.connect(**DB_CONFIG)
+    """写入 MySQL（事务保护，使用连接池）"""
+    conn = db.get_connection()
     try:
+        conn.begin()
         with conn.cursor() as cur:
             cur.execute("DELETE FROM emby_movies")
             deleted = cur.rowcount
@@ -223,6 +156,10 @@ def save_to_mysql(movies: List[Dict]):
 
             conn.commit()
             print(f"已写入 MySQL：删除旧记录 {deleted} 条，插入新记录 {len(movies)} 条")
+    except Exception as e:
+        conn.rollback()
+        print(f"写入 MySQL 失败，已回滚: {e}")
+        raise
     finally:
         conn.close()
 

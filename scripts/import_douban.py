@@ -7,11 +7,10 @@ import csv
 import os
 import sys
 
-import pymysql
-
 # 添加项目根目录到 path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import DB_CONFIG
+from scripts import db
 
 
 def import_csv(csv_path: str):
@@ -28,7 +27,7 @@ def import_csv(csv_path: str):
     print(f"读取 CSV: {len(rows)} 条记录")
 
     # 写入 MySQL
-    conn = pymysql.connect(**DB_CONFIG)
+    conn = db.get_connection()
     try:
         with conn.cursor() as cur:
             cur.execute("DELETE FROM douban_top250")
@@ -46,6 +45,10 @@ def import_csv(csv_path: str):
 
             conn.commit()
             print(f"MySQL: 删除旧记录 {deleted} 条，插入新记录 {len(rows)} 条")
+    except Exception as e:
+        conn.rollback()
+        print(f"MySQL: 写入失败，已回滚: {e}")
+        raise
     finally:
         conn.close()
 

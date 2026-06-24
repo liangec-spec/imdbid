@@ -9,7 +9,8 @@ import requests
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import DB_CONFIG, EMBY_CONFIG, TMDB_API_KEY
-import pymysql
+from scripts import db
+from scripts.movie_utils import parse_collection_movie, build_poster_url
 
 EMBY_COLLECTIONS_PARENT_ID = os.getenv("EMBY_COLLECTIONS_PARENT_ID", "43626")
 
@@ -60,36 +61,7 @@ def get_emby_collection_movies(server, api_key, collection_id):
 
     movies = []
     for item in data.get("Items", []):
-        people = item.get("People", [])
-        directors = "|".join([p.get("Name", "") for p in people if p.get("Type") == "Director"])
-        actors = "|".join([p.get("Name", "") for p in people if p.get("Type") == "Actor"][:10])
-        genres = "|".join(item.get("Genres", []))
-        studios = "|".join([s.get("Name", "") for s in item.get("Studios", [])])
-
-        media_sources = item.get("MediaSources", [{}])[0] if item.get("MediaSources") else {}
-        video_stream = next((s for s in item.get("MediaStreams", []) if s.get("Type") == "Video"), {})
-        audio_stream = next((s for s in item.get("MediaStreams", []) if s.get("Type") == "Audio"), {})
-
-        movies.append({
-            "emby_id": item.get("Id"),
-            "name": item.get("Name", ""),
-            "original_title": item.get("OriginalTitle", ""),
-            "year": item.get("ProductionYear"),
-            "rating": item.get("CommunityRating"),
-            "imdb_id": item.get("ProviderIds", {}).get("Imdb", ""),
-            "tmdb_id": item.get("ProviderIds", {}).get("Tmdb", ""),
-            "overview": item.get("Overview", ""),
-            "genres": genres,
-            "directors": directors,
-            "actors": actors,
-            "studios": studios,
-            "video_codec": video_stream.get("Codec", ""),
-            "audio_codec": audio_stream.get("Codec", ""),
-            "size": media_sources.get("Size"),
-            "video_resolution": f"{video_stream.get('Width', '')}x{video_stream.get('Height', '')}" if video_stream.get("Width") else "",
-            "path": media_sources.get("Path", ""),
-            "in_emby": True,
-        })
+        movies.append(parse_collection_movie(item))
     return movies
 
 
@@ -110,12 +82,10 @@ def get_tmdb_collection_movies(tmdb_id):
     data = resp.json()
 
     # 合集海报
-    poster_path = data.get("poster_path", "")
-    poster_url = f"https://image.tmdb.org/t/p/w300{poster_path}" if poster_path else None
+    poster_url = build_poster_url(data.get("poster_path", ""))
 
     movies = []
     for part in data.get("parts", []):
-        part_poster = part.get("poster_path", "")
         movies.append({
             "tmdb_id": str(part.get("id", "")),
             "name": part.get("title", ""),
@@ -123,7 +93,7 @@ def get_tmdb_collection_movies(tmdb_id):
             "year": int(part.get("release_date", "")[:4]) if part.get("release_date") else None,
             "rating": part.get("vote_average"),
             "overview": part.get("overview", ""),
-            "poster_url": f"https://image.tmdb.org/t/p/w300{part_poster}" if part_poster else "",
+            "poster_url": build_poster_url(part.get("poster_path", "")) or "",
             "in_emby": False,
         })
     return movies, poster_url
@@ -141,8 +111,9 @@ def sync_collections():
     # 获取 Emby 合集
     collections = get_emby_collections(server, api_key)
 
-    conn = pymysql.connect(**DB_CONFIG)
+    conn = db.get_connection()
     try:
+        conn.begin()
         with conn.cursor() as cur:
             # 清空旧数据
             cur.execute("DELETE FROM emby_collection_movies")
@@ -186,7 +157,6 @@ def sync_collections():
                     (emby_id, col["name"], tmdb_id, col["child_count"],
                      len(tmdb_movies), missing_count, col["overview"], collection_poster)
                 )
-                collection_db_id = cur.lastrowid
 
                 # 获取刚插入的合集 ID
                 cur.execute("SELECT id FROM emby_collections WHERE emby_id = %s", (emby_id,))
@@ -213,6 +183,9 @@ def sync_collections():
 
             conn.commit()
             print(f"\n✅ 同步完成，共 {len(collections)} 个合集")
+    except Exception as e:
+        conn.rollback()
+        print(f"同步失败，已回滚: {e}")
     finally:
         conn.close()
 
