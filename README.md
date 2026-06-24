@@ -4,14 +4,14 @@
 
 ## ✨ 功能
 
-- **Emby 电影导出** - 从 Emby 服务器批量导出电影元数据
-- **IMDB Top 250 对比** - 使用贝叶斯加权公式计算排名（最低 100,000 票）
-- **豆瓣 Top 250 对比** - 自动检测缺失电影
-- **IMDB 评分获取** - 从 IMDB 公开数据集批量获取评分（匹配率 99.9%）
-- **电影合集管理** - 展示 Emby 合集，显示未收录电影（基于 TMDB）
-- **即将/正在上映** - 中国/美国各 50 部电影
-- **Web 管理界面** - 搜索、筛选、排序、分页、主题切换
-- **Docker 部署** - 一键部署到生产环境
+- **Emby 电影导出** — 从 Emby 服务器批量导出电影元数据
+- **IMDB Top 250 对比** — 使用贝叶斯加权公式计算排名（最低 100,000 票）
+- **豆瓣 Top 250 对比** — 自动检测缺失电影，支持手动关联 IMDB ID
+- **IMDB 评分获取** — 从 IMDB 公开数据集批量获取评分（匹配率 99.9%）
+- **电影合集管理** — 展示 Emby 合集，显示未收录电影（基于 TMDB）
+- **即将/正在上映** — 中国/美国各 50 部电影
+- **Web 管理界面** — 搜索、筛选、排序、分页、主题切换、实时操作日志
+- **Docker 部署** — 一键部署到生产环境
 
 ## 📁 项目结构
 
@@ -20,6 +20,9 @@ imdbid/
 ├── config/                     # 集中配置
 │   └── __init__.py
 ├── scripts/                    # 脚本工具
+│   ├── db.py                   # 共享数据库模块（连接池）
+│   ├── movie_utils.py          # 共享电影工具函数
+│   ├── backup_db.sh            # 数据库备份脚本
 │   ├── export_emby.py          # Emby 导出（含 IMDB 评分）
 │   ├── fetch_imdb_top250.py    # IMDB Top 250 获取
 │   ├── fetch_douban_top250.py  # 豆瓣 Top 250 爬虫
@@ -27,9 +30,10 @@ imdbid/
 │   ├── sync_collections.py     # 电影合集同步
 │   └── sync_upcoming.py        # 即将/正在上映同步
 ├── web/                        # Web 管理界面
-│   ├── app.py
+│   ├── app.py                  # Flask 后端
+│   ├── safe_order.py           # ORDER BY 白名单映射
 │   └── templates/
-│       └── index.html
+│       └── index.html          # 单页前端（SPA）
 ├── sql/                        # 数据库脚本
 │   └── schema.sql
 ├── data/                       # 数据文件（Git 忽略）
@@ -41,6 +45,8 @@ imdbid/
 ├── .env.example                # 环境变量模板
 ├── .gitignore
 ├── requirements.txt
+├── start-dev.sh                # 本地开发启动脚本
+├── README_DEV.md               # 本地开发指南
 └── README.md
 ```
 
@@ -105,42 +111,18 @@ docker compose exec app python scripts/sync_upcoming.py
 
 ### 方式二：本地开发
 
-#### 1. 安装依赖
+详见 `README_DEV.md`
 
 ```bash
-python3 -m venv venv
-source venv/bin/activate
+# 安装依赖
+python3 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-```
 
-#### 2. 配置环境变量
+# 配置环境变量
+cp .env.example .env && vi .env
 
-```bash
-cp .env.example .env
-# 编辑 .env 文件
-```
-
-#### 3. 初始化数据库
-
-```bash
-mysql -u root < sql/schema.sql
-```
-
-#### 4. 运行脚本
-
-```bash
-python scripts/export_emby.py --mysql
-python scripts/fetch_imdb_top250.py
-python scripts/fetch_douban_top250.py
-python scripts/sync_collections.py
-python scripts/sync_upcoming.py
-```
-
-#### 5. 启动 Web 界面
-
-```bash
-python web/app.py
-# 访问 http://localhost:5000
+# 启动开发服务器
+./start-dev.sh
 ```
 
 ## ⚙️ 配置项说明
@@ -149,12 +131,15 @@ python web/app.py
 
 | 变量 | 必填 | 默认值 | 说明 |
 | ---- | ---- | ------ | ---- |
-| `EMBY_SERVER` | ✅ | - | Emby 服务器地址 |
-| `EMBY_API_KEY` | ✅ | - | Emby API 密钥 |
-| `EMBY_PARENT_ID` | ✅ | - | 电影媒体库 ID |
-| `DB_PASSWORD` | ✅ | - | MySQL root 密码 |
+| `EMBY_SERVER` | ✅ | --- | Emby 服务器地址 |
+| `EMBY_API_KEY` | ✅ | --- | Emby API 密钥 |
+| `EMBY_PARENT_ID` | ✅ | --- | 电影媒体库 ID |
+| `DB_PASSWORD` | ✅ | --- | MySQL root 密码 |
+| `DB_HOST` | ❌ | localhost | 数据库地址 |
+| `DB_USER` | ❌ | root | 数据库用户 |
+| `DB_NAME` | ❌ | douban_top250 | 数据库名 |
 | `EMBY_COLLECTIONS_PARENT_ID` | ❌ | 43626 | 合集媒体库 ID |
-| `TMDB_API_KEY` | ❌ | - | TMDB API Key（合集和即将上映功能需要） |
+| `TMDB_API_KEY` | ❌ | --- | TMDB API Key（合集和即将上映功能需要） |
 
 ### 获取配置值
 
@@ -173,10 +158,10 @@ curl -s "http://your-emby-server:8096/Library/VirtualFolders?api_key=your-api-ke
 
 ## 🛠️ 技术栈
 
-- **后端**: Python 3.12, Flask, Gunicorn, PyMySQL
-- **前端**: HTML5, CSS3, JavaScript
+- **后端**: Python 3.12, Flask, Gunicorn, PyMySQL, DBUtils（连接池）
+- **前端**: HTML5, CSS3, JavaScript（原生 SPA，无框架）
 - **数据库**: MySQL 8.0
-- **数据源**: Emby API, IMDB 公开数据集, TMDB API, 豆瓣
+- **数据源**: Emby API, IMDB 公开数据集, TMDB API v3, 豆瓣爬虫
 - **部署**: Docker, Docker Compose, GitHub Actions
 
 ## 📊 数据库
@@ -196,10 +181,10 @@ curl -s "http://your-emby-server:8096/Library/VirtualFolders?api_key=your-api-ke
 ### 电影清单
 
 - 分页显示（每页 50 条）
-- 搜索（电影名称、IMDB ID）
-- 排序（名称、年份、IMDB 评分、加入日期）
+- 搜索（电影名称、原始标题、IMDB ID）
+- 排序（名称、年份、IMDB 评分/投票数、加入日期）
 - 筛选（全部、仅 IMDB 250、仅豆瓣 250、两者都在）
-- 点击展开详情（导演、演员、简介、编码等）
+- 点击展开详情（支持平滑动画展开/收起）
 - 显示封面缩略图、分辨率、位置、加入日期
 - IMDB/豆瓣排名显示（前 50 加粗）
 
@@ -220,128 +205,57 @@ curl -s "http://your-emby-server:8096/Library/VirtualFolders?api_key=your-api-ke
 - 中国/美国各 50 部电影
 - 即将上映（按上映日期排序）
 - 正在上映（按热度排序）
-- 显示电影海报
+- 支持深色/亮色主题
 
-### 主题切换
+### 管理页面
 
-6 种配色主题：午夜蓝、翡翠绿、日落粉、海洋蓝、星空紫、浅色模式
+- 数据总览：Emby 电影总数、IMDB/豆瓣 Top 250 缺失数、合集数
+- 一键更新按钮：Emby 清单、IMDB 250、豆瓣 250、合集、即将上映
+- **实时操作日志**：点击更新后日志区域实时显示脚本执行输出
 
-## 🔄 版本发布
+### 其他特性
 
-### 自动发布（GitHub Actions）
+- **页面记忆**：刷新后自动恢复到上次浏览的页面
+- **侧边栏布局**：Logo 点击返回电影页，管理入口在底部
+- **亮色/暗色主题切换**
 
-```bash
-# 1. 修改代码并提交
-git add .
-git commit -m "feat: 添加新功能"
-git push
+## 📜 更新日志
 
-# 2. 创建版本 tag
-git tag -a v2.1.0 -m "版本 2.1.0"
-git push origin v2.1.0
+### v2.3.0 (2026-06-24)
 
-# 3. GitHub Actions 自动构建并推送到 Docker Hub
-```
+全量优化：安全修复 + 数据完整性 + 代码重构 + 性能优化
 
-### 版本号规范
+#### 🔒 安全修复
+- **XSS 修复**：所有 API 数据字段（标题、简介、演职人员等）统一 HTML 转义
+- **SQL 注入修复**：ORDER BY 子句使用白名单映射表
+- **图片代理校验**：改用 `urlparse` 严格校验 `scheme + netloc`
 
-采用语义化版本号：`v主版本.次版本.补丁版本`
+#### 💾 数据完整性
+- 所有 DELETE+INSERT 操作添加事务保护（`begin`/`rollback`）
+- Gunicorn 启动修复：`before_request` 懒初始化替代模块级代码
+- 路径分隔符兼容：同时支持 Linux（`/`）和 Windows（`\\`）路径
 
-- **主版本**：重大变更
-- **次版本**：新功能
-- **补丁版本**：bug 修复
+#### 🧹 代码重构
+- 新增 `scripts/db.py`：共享数据库层 + DBUtils 连接池（10 连接）
+- 新增 `scripts/movie_utils.py`：统一电影解析、海报 URL 构建等工具函数
+- 所有脚本统一通过 `db` 模块操作数据库，消除 7 处重复代码
+- 清理死代码：`extract_douban_id_from_link` 别名等
 
-## 🔗 相关链接
+#### ⚡ 性能优化
+- **IMDB 排名查询提速 25 倍**：嵌套子查询 → `ROW_NUMBER()` 窗口函数 JOIN
+- 数据库连接池复用，减少 TCP 建连开销
 
-- **GitHub**: <https://github.com/liangec-spec/imdbid>
-- **Docker Hub**: <https://hub.docker.com/r/liangec/emby-movies>
+#### 📝 日志功能
+- 实时流式日志：`subprocess.Popen` + `PYTHONUNBUFFERED` 逐行输出
+- 管理页面日志区域实时显示脚本执行过程
 
-## 📦 Docker 镜像
+#### 🎨 前端优化
+- 展开详情双向动画（展开/收起均平滑过渡）
+- 页面记忆：`localStorage` 保存当前页面，刷新后恢复
+- 侧边栏布局优化：Logo 可点击返回电影页
 
-| 标签 | 说明 |
-| ---- | ---- |
-| `liangec/emby-movies:latest` | 最新稳定版 |
-| `liangec/emby-movies:v2.2.2` | 特定版本 |
-
-## 📝 版本历史
-
-### v2.2.2 (2026-06-23)
-
-- 图片代理添加本地缓存
-- 图片延迟加载，避免并发过多导致 502
-- 自动清理 30 天前的缓存
-
-### v2.2.1 (2026-06-22)
-
-- 修复 cron 任务使用 python3
-- 添加正在上映页面（中国/美国各 50 部）
-- 同步脚本同时更新即将上映和正在上映
-
-### v2.2.0 (2026-06-18)
-
-- 即将上映电影功能
-  - 中国/美国各 50 部即将上映电影
-  - 数据库存储，每日自动更新（cron）
-  - 手动更新按钮
-- 电影封面图片
-  - 所有清单显示封面缩略图
-  - 详情页大图展示
-  - 图片代理（公网无需访问 Emby）
-- 合集管理优化
-  - 合集主行显示海报
-  - 合集内电影显示海报
-- 电影排名显示
-  - IMDB/豆瓣排名数字显示（前 50 加粗）
-- 界面优化
-  - 侧边栏导航 + 表格优先布局
-  - 浅色主题默认
-  - 详情页下拉动画
-  - 固定列宽，防止展开时跳动
-
-### v2.1.0 (2026-06-16)
-
-- 电影合集管理功能
-  - 合集列表（分页、搜索、筛选）
-  - 基于 TMDB API 显示未收录电影
-  - 数据库缓存，秒级响应
-- 电影详情展开功能
-  - 所有清单支持点击展开详情
-  - 显示导演、演员、简介、编码等
-- 分辨率从 path 字段提取
-- 位置列显示（movie1/movie2）
-- 主题切换功能（6种配色）
-- 后端分页和搜索 API
-
-### v2.0.0 (2026-06-15)
-
-- 豆瓣 Top 250 使用 douban_id 作为主键
-- 手动关联功能（文件+数据库双备份）
-- 后端分页和搜索 API
-- 分辨率从 path 字段提取
-- 新增位置列显示
-- 最低投票数提高到 100,000
-
-### v1.2.0 (2026-06-11)
-
-- 用 Python 重写豆瓣爬虫，移除 Go 依赖
-- 优化 IMDB Top 250 脚本内存占用
-- 增加容器内存限制到 1GB
-
-### v1.1.0 (2026-06-10)
-
-- 修复数据库连接配置
-- 修复日期字段空字符串报错
-- 简化 Dockerfile
-
-### v1.0.0 (2026-06-09)
-
-- 初始版本发布
-- Emby 电影导出
-- IMDB/豆瓣 Top 250 对比
-- Web 管理界面
-- Docker 部署支持
-- GitHub Actions 自动构建
-
-## 📄 许可证
-
-MIT License
+#### 🐛 其他修复
+- 豆瓣编辑按钮修复（`showEdit` 改用 DOM API 避免 onclick 转义问题）
+- 豆瓣编辑行显示修复（`active` 类缺失导致隐藏）
+- 模板缓存问题（`debug=False` 时需重启 Flask 刷新模板）
+- 更新后页面不再强制刷新，停留在当前页面
