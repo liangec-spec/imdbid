@@ -14,11 +14,10 @@ import requests
 
 # 添加项目根目录到 path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from config import DB_CONFIG, IMDB_DATASETS, DATA_DIR
+from config import DB_CONFIG, IMDB_DATASETS, DATA_DIR, MIN_VOTES
 from scripts import db
 
 # 最少投票数（过滤冷门电影）
-MIN_VOTES = 100000
 
 
 def download_and_process_ratings():
@@ -28,7 +27,8 @@ def download_and_process_ratings():
     r.raise_for_status()
 
     rating_map = {}
-    all_ratings = []
+    total_rating_sum = 0.0
+    total_count = 0
 
     with gzip.open(io.BytesIO(r.content), "rt", encoding="utf-8") as f:
         reader = csv.DictReader(f, delimiter="\t")
@@ -39,14 +39,15 @@ def download_and_process_ratings():
                 if votes >= MIN_VOTES:
                     tconst = row["tconst"]
                     rating_map[tconst] = {"rating": avg, "votes": votes}
-                    all_ratings.append(avg)
+                    total_rating_sum += avg
+                    total_count += 1
             except (ValueError, TypeError):
                 continue
 
     print(f"  投票数 >= {MIN_VOTES} 的电影: {len(rating_map)} 部")
 
     # 计算全局平均分 C
-    C = sum(all_ratings) / len(all_ratings) if all_ratings else 0
+    C = total_rating_sum / total_count if total_count else 0
     print(f"  全局平均分 C = {C:.2f}")
 
     return rating_map, C
@@ -121,8 +122,8 @@ def save_to_mysql(movies):
             deleted = cur.rowcount
 
             sql = "INSERT INTO imdb_top250 (title, imdb_id) VALUES (%s, %s)"
-            for m in movies:
-                cur.execute(sql, (m["title"], m["imdb_id"]))
+            rows = [(m["title"], m["imdb_id"]) for m in movies]
+            cur.executemany(sql, rows)
 
             conn.commit()
             print(f"MySQL: 删除旧记录 {deleted} 条，插入新记录 {len(movies)} 条")

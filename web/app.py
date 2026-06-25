@@ -39,8 +39,6 @@ EMBY_COLLECTIONS_PARENT_ID = os.getenv("EMBY_COLLECTIONS_PARENT_ID", "43626")
 task_status = {"emby": None, "imdb": None, "douban": None, "collections": None, "upcoming": None}
 status_lock = threading.Lock()
 
-
-
 def update_status(task_name, status, message):
     with status_lock:
         if task_status[task_name] is None:
@@ -48,13 +46,11 @@ def update_status(task_name, status, message):
         task_status[task_name]["status"] = status
         task_status[task_name]["message"] = message
 
-
 def append_log(task_name, text):
     with status_lock:
         if task_status[task_name] is None:
             task_status[task_name] = {"log": ""}
         task_status[task_name]["log"] += text
-
 
 def run_task(task_name, cmd, cwd=None):
     from datetime import datetime
@@ -77,20 +73,6 @@ def run_task(task_name, cmd, cwd=None):
         update_status(task_name, "error", str(e))
         append_log(task_name, "异常: %s\n" % e)
 
-def run_task(task_name, cmd, cwd=None):
-    update_status(task_name, "running", "执行中...")
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=600, cwd=cwd)
-        if result.returncode == 0:
-            output = result.stdout.strip()
-            last_line = output.split("\n")[-1] if output else "完成"
-            update_status(task_name, "done", last_line)
-        else:
-            update_status(task_name, "error", result.stderr[-200:])
-    except Exception as e:
-        update_status(task_name, "error", str(e))
-
-
 # ========== 映射文件管理 ==========
 
 def load_mapping():
@@ -106,14 +88,12 @@ def load_mapping():
     except Exception:
         return {"version": 2, "updated_at": None, "mappings": {}}
 
-
 def save_mapping(data):
     os.makedirs(os.path.dirname(MAPPING_FILE), exist_ok=True)
     data["updated_at"] = datetime.now().isoformat()
     data["version"] = 2
     with open(MAPPING_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
-
 
 def sync_mapping_to_db():
     data = load_mapping()
@@ -136,7 +116,6 @@ def sync_mapping_to_db():
         finally:
             conn.close()
     return len(mappings)
-
 
 @app.route("/")
 def index():
@@ -169,7 +148,6 @@ def index():
         imdb_missing_count=imdb_missing_count,
     )
 
-
 @app.route("/api/movies")
 def api_movies():
     page = request.args.get("page", 1, type=int)
@@ -197,7 +175,7 @@ def api_movies():
     order_dir = "DESC" if sort_order == "desc" else "ASC"
 
     if filter_type in ("imdb", "both"):
-        imdb_join = "INNER JOIN imdb_top250 i ON e.imdb_id = i.imdb_id"
+        imdb_join = "INNER JOIN imdb_top250 i ON e.imdb_id = i.imdb_id LEFT JOIN (SELECT imdb_id, ROW_NUMBER() OVER (ORDER BY id) AS ranking FROM imdb_top250) ir ON e.imdb_id = ir.imdb_id"
     else:
         imdb_join = "LEFT JOIN imdb_top250 i ON e.imdb_id = i.imdb_id LEFT JOIN (SELECT imdb_id, ROW_NUMBER() OVER (ORDER BY id) AS ranking FROM imdb_top250) ir ON e.imdb_id = ir.imdb_id"
 
@@ -258,7 +236,6 @@ def api_movies():
         "per_page": per_page, "total_pages": (total + per_page - 1) // per_page,
     })
 
-
 @app.route("/api/movies/missing")
 def api_missing_movies():
     type = request.args.get("type", "imdb", type=str)
@@ -282,7 +259,6 @@ def api_missing_movies():
             ORDER BY i.id
         """)
     return jsonify({"movies": movies})
-
 
 @app.route("/api/top250")
 def api_top250():
@@ -342,14 +318,12 @@ def api_top250():
             movies.append(r)
     return jsonify({"movies": movies})
 
-
 # ========== 映射管理 API ==========
 
 @app.route("/api/mapping")
 def api_mapping_get():
     data = load_mapping()
     return jsonify(data)
-
 
 @app.route("/api/mapping", methods=["POST"])
 def api_mapping_save():
@@ -383,7 +357,6 @@ def api_mapping_save():
 
     return jsonify({"status": "ok", "message": "保存成功"})
 
-
 @app.route("/api/mapping/<douban_id>", methods=["DELETE"])
 def api_mapping_delete(douban_id):
     data = load_mapping()
@@ -393,12 +366,10 @@ def api_mapping_delete(douban_id):
     db.execute("DELETE FROM douban_imdb_mapping WHERE douban_id = %s", (douban_id,))
     return jsonify({"status": "ok", "message": "删除成功"})
 
-
 @app.route("/api/mapping/sync", methods=["POST"])
 def api_mapping_sync():
     count = sync_mapping_to_db()
     return jsonify({"status": "ok", "message": f"同步完成，共 {count} 条记录"})
-
 
 @app.route("/api/update/emby", methods=["POST"])
 def update_emby():
@@ -410,7 +381,6 @@ def update_emby():
     thread.start()
     return jsonify({"status": "started"})
 
-
 @app.route("/api/update/imdb", methods=["POST"])
 def update_imdb():
     with status_lock:
@@ -420,7 +390,6 @@ def update_imdb():
     thread = threading.Thread(target=run_task, args=("imdb", [sys.executable, SCRIPTS["imdb"]]))
     thread.start()
     return jsonify({"status": "started"})
-
 
 @app.route("/api/update/douban", methods=["POST"])
 def update_douban():
@@ -432,7 +401,6 @@ def update_douban():
     thread.start()
     return jsonify({"status": "started"})
 
-
 @app.route("/api/update/collections", methods=["POST"])
 def update_collections():
     with status_lock:
@@ -442,7 +410,6 @@ def update_collections():
     thread = threading.Thread(target=run_task, args=("collections", [sys.executable, SCRIPTS["collections"]]))
     thread.start()
     return jsonify({"status": "started"})
-
 
 @app.route("/api/upcoming")
 def api_upcoming():
@@ -476,7 +443,6 @@ def api_upcoming():
 
     return jsonify({"movies": movies, "region": region})
 
-
 @app.route("/api/update/upcoming", methods=["POST"])
 def update_upcoming():
     with status_lock:
@@ -486,7 +452,6 @@ def update_upcoming():
     thread = threading.Thread(target=run_task, args=("upcoming", [sys.executable, SCRIPTS["upcoming"]]))
     thread.start()
     return jsonify({"status": "started"})
-
 
 @app.route("/api/status")
 def get_status():
@@ -499,9 +464,7 @@ def get_status():
             return jsonify({"log": info.get("log", "")})
         return jsonify(task_status)
 
-
 POSTER_CACHE_DIR = os.path.join(DATA_DIR, "posters")
-
 
 def _get_poster_cache_path(url):
     """生成缓存文件路径"""
@@ -511,7 +474,6 @@ def _get_poster_cache_path(url):
     if ".png" in url:
         ext = ".png"
     return os.path.join(POSTER_CACHE_DIR, f"{url_hash}{ext}")
-
 
 def _cleanup_poster_cache():
     """清理超过 30 天的缓存图片"""
@@ -523,7 +485,6 @@ def _cleanup_poster_cache():
         path = os.path.join(POSTER_CACHE_DIR, f)
         if os.path.isfile(path) and (now - os.path.getmtime(path)) > 30 * 86400:
             os.remove(path)
-
 
 @app.route("/api/poster/<path:encoded_url>")
 def api_poster(encoded_url):
@@ -571,7 +532,6 @@ def api_poster(encoded_url):
     except Exception:
         return "", 502
 
-
 # ========== 合集管理 API ==========
 
 @app.route("/api/collections")
@@ -583,7 +543,6 @@ def api_collections():
         ORDER BY name
     """)
     return jsonify({"collections": rows, "total": len(rows)})
-
 
 @app.route("/api/collections/<int:collection_id>")
 def api_collection_detail(collection_id):
@@ -639,7 +598,6 @@ def api_collection_detail(collection_id):
         "movies": owned,
         "missing": missing,
     })
-
 
 # 启动时同步映射数据和清理缓存（Gunicorn 和直接运行都会执行）
 _app_initialized = False

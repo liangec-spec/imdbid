@@ -162,22 +162,24 @@ def sync_collections():
                 cur.execute("SELECT id FROM emby_collections WHERE emby_id = %s", (emby_id,))
                 collection_db_id = cur.fetchone()[0]
 
-                # 插入电影
+                # 插入电影（批量）
+                movie_rows = []
                 for m in all_movies:
-                    cur.execute(
-                        """INSERT INTO emby_collection_movies
-                        (collection_id, tmdb_id, name, original_title, year, rating,
-                         imdb_rating, imdb_votes, imdb_id, overview, genres, directors,
-                         actors, studios, video_codec, audio_codec, size, video_resolution,
-                         path, in_emby, poster_url)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
-                        (collection_db_id, m.get("tmdb_id"), m.get("name"), m.get("original_title"),
-                         m.get("year"), m.get("rating"), m.get("imdb_rating"), m.get("imdb_votes"),
-                         m.get("imdb_id"), m.get("overview"), m.get("genres"), m.get("directors"),
-                         m.get("actors"), m.get("studios"), m.get("video_codec"), m.get("audio_codec"),
-                         m.get("size"), m.get("video_resolution"), m.get("path"),
-                         1 if m.get("in_emby") else 0, m.get("poster_url"))
-                    )
+                    movie_rows.append((
+                        collection_db_id, m.get("tmdb_id"), m.get("name"), m.get("original_title"),
+                        m.get("year"), m.get("rating"), m.get("imdb_rating"), m.get("imdb_votes"),
+                        m.get("imdb_id"), m.get("overview"), m.get("genres"), m.get("directors"),
+                        m.get("actors"), m.get("studios"), m.get("video_codec"), m.get("audio_codec"),
+                        m.get("size"), m.get("video_resolution"), m.get("path"),
+                        1 if m.get("in_emby") else 0, m.get("poster_url")
+                    ))
+                cur.executemany("""INSERT INTO emby_collection_movies
+                    (collection_id, tmdb_id, name, original_title, year, rating,
+                     imdb_rating, imdb_votes, imdb_id, overview, genres, directors,
+                     actors, studios, video_codec, audio_codec, size, video_resolution,
+                     path, in_emby, poster_url)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                    movie_rows)
 
                 print(f"  已收录: {len(emby_movies)}, 未收录: {missing_count}")
 

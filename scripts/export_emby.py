@@ -138,8 +138,9 @@ def save_to_mysql(movies: List[Dict]):
             def val(v):
                 return v if v != "" else None
 
+            rows = []
             for m in movies:
-                cur.execute(sql, (
+                rows.append((
                     m.get("title"), m.get("original_title"), val(m.get("year")),
                     m.get("imdb_id"), m.get("imdb_url"), m.get("tmdb_id"),
                     val(m.get("rating")), val(m.get("community_rating")), val(m.get("vote_count")),
@@ -153,7 +154,7 @@ def save_to_mysql(movies: List[Dict]):
                     val(m.get("imdb_rating")), val(m.get("imdb_votes")),
                     m.get("poster_url") or None,
                 ))
-
+            cur.executemany(sql, rows)
             conn.commit()
             print(f"已写入 MySQL：删除旧记录 {deleted} 条，插入新记录 {len(movies)} 条")
     except Exception as e:

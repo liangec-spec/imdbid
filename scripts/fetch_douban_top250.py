@@ -192,9 +192,8 @@ def save_to_mysql(movies):
             deleted = cur.rowcount
 
             sql = "INSERT INTO douban_top250 (ranking, title, douban_id, douban_link, imdb_id) VALUES (%s, %s, %s, %s, %s)"
-            for movie in movies:
-                imdb_id = movie["imdb_id"] if movie["imdb_id"] else None
-                cur.execute(sql, (movie["rank"], movie["name"], movie["douban_id"], movie["link"], imdb_id))
+            rows = [(m["rank"], m["name"], m["douban_id"], m["link"], m["imdb_id"] if m["imdb_id"] else None) for m in movies]
+            cur.executemany(sql, rows)
 
             conn.commit()
             print(f"MySQL: 删除旧记录 {deleted} 条，插入新记录 {len(movies)} 条")

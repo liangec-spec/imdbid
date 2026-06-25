@@ -22,15 +22,16 @@
   --border: rgba(255,255,255,.08);
 }
 * { margin:0; padding:0; box-sizing:border-box; }
-body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; background:var(--bg); color:var(--text); min-height:100vh; display:flex; }
+body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; background:var(--bg); color:var(--text); min-height:100vh; display:flex; overflow-x:hidden; }
 
 /* ===== 侧边栏 ===== */
 .sidebar { width:var(--sidebar-w); background:var(--bg2); border-right:1px solid var(--border); display:flex; flex-direction:column; position:fixed; top:0; left:0; bottom:0; z-index:100; transition:transform .2s; }
-.sidebar-header { padding:20px 16px 12px; border-bottom:1px solid rgba(255,255,255,.06); }
+.sidebar-header { padding:20px 16px 16px; border-bottom:1px solid var(--border); cursor:pointer; border-radius:0; transition:background .15s; }
+.sidebar-header:hover { background:rgba(255,255,255,.03); }
 .sidebar-header h1 { font-size:18px; font-weight:700; }
 .sidebar-header p { font-size:12px; color:var(--dim); margin-top:4px; }
 .sidebar-nav { flex:1; padding:12px 8px; overflow-y:auto; }
-.nav-item { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:var(--radius); cursor:pointer; font-size:14px; color:var(--dim); transition:all .15s; margin-bottom:2px; }
+.nav-item { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:var(--radius); cursor:pointer; font-size:14px; color:var(--dim); transition:all .15s; margin-bottom:4px; }
 .nav-item:hover { color:var(--text); background:rgba(255,255,255,.05); }
 .nav-item.active { color:var(--accent); background:rgba(56,189,248,.1); font-weight:600; }
 .nav-item .icon { font-size:18px; width:24px; text-align:center; }
@@ -39,7 +40,7 @@ body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; backg
 .theme-select { width:100%; background:var(--bg); color:var(--text); border:1px solid var(--border); padding:6px 10px; border-radius:var(--radius); font-size:13px; cursor:pointer; }
 
 /* ===== 主内容 ===== */
-.main { flex:1; margin-left:var(--sidebar-w); min-height:100vh; }
+.main { flex:1; margin-left:var(--sidebar-w); min-height:100vh; overflow-x:hidden; }
 .topbar { height:var(--header-h); background:var(--bg2); border-bottom:1px solid rgba(255,255,255,.06); display:flex; align-items:center; justify-content:space-between; padding:0 24px; position:sticky; top:0; z-index:50; }
 .topbar-left { display:flex; align-items:center; gap:16px; }
 .topbar-title { font-size:16px; font-weight:600; }
@@ -59,7 +60,7 @@ body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; backg
 .page.active { display:block; }
 
 /* 统计卡片 */
-.stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-bottom:20px; }
+.stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:16px; margin-bottom:20px; }
 .stat-card { background:var(--bg2); border-radius:var(--radius-lg); padding:16px 20px; border:1px solid var(--border); }
 .stat-card .num { font-size:28px; font-weight:700; color:var(--accent); }
 .stat-card .label { font-size:12px; color:var(--dim); margin-top:2px; }
@@ -87,6 +88,7 @@ td:nth-child(2) { font-size:15px; font-weight:600; white-space:normal; }
 .poster-thumb { width:40px; height:56px; border-radius:4px; object-fit:cover; background:var(--bg3); vertical-align:middle; margin-right:10px; }
 /* hover 不变色 */
 .clickable-row { cursor:pointer; }
+.clickable-row:hover { background:rgba(255,255,255,.03); }
 .clickable-row td:first-child::before { content:'\25B6'; display:inline-block; margin-right:5px; font-size:9px; transition:transform .25s ease; color:var(--dim); }
 .clickable-row.expanded td:first-child::before { transform:rotate(90deg); }
 .detail-row { display:none; }
@@ -121,14 +123,23 @@ a:hover { text-decoration:underline; }
 .status-error { background:rgba(248,113,113,.12); color:var(--red); }
 
 /* 即将上映 */
-.upcoming-grid { display:flex; flex-direction:column; gap:10px; }
-.upcoming-card { display:flex; gap:12px; background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius); padding:10px; transition:all .15s; }
-.upcoming-card:hover { border-color:var(--accent); }
-.upcoming-poster { width:60px; height:90px; border-radius:6px; object-fit:cover; background:var(--bg3); flex-shrink:0; }
-.upcoming-info { flex:1; min-width:0; }
-.upcoming-title { font-size:14px; font-weight:600; margin-bottom:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.upcoming-meta { font-size:12px; color:var(--dim); display:flex; gap:10px; }
-.upcoming-overview { font-size:12px; color:var(--dim); margin-top:4px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.upcoming-row { position:relative; margin-bottom:20px; width:100%; }
+.upcoming-row-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+.upcoming-row-header h3 { font-size:16px; }
+.upcoming-carousel { display:flex; gap:12px; padding:4px 0; overflow-x:hidden; width:100%; }
+.upcoming-card { flex-shrink:0; width:160px; background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius-lg); overflow:hidden; transition:all .2s; cursor:pointer; }
+.upcoming-card:hover { border-color:var(--accent); transform:translateY(-2px); box-shadow:0 4px 12px rgba(0,0,0,.15); }
+.upcoming-card-poster { width:160px; height:220px; object-fit:cover; background:var(--bg3); display:block; }
+.upcoming-card-poster-placeholder { display:flex; align-items:center; justify-content:center; font-size:36px; color:var(--dim2); }
+.upcoming-card-info { padding:8px 10px; }
+.upcoming-card-title { font-size:13px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.upcoming-card-meta { font-size:11px; color:var(--dim); display:flex; gap:8px; margin-top:2px; }
+.upcoming-nav { position:absolute; top:50%; transform:translateY(-50%); width:36px; height:36px; border-radius:50%; background:var(--bg2); border:1px solid var(--border); color:var(--text); font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; opacity:0; transition:opacity .2s; z-index:10; box-shadow:0 2px 8px rgba(0,0,0,.15); }
+.upcoming-row:hover .upcoming-nav { opacity:1; }
+.upcoming-nav:hover { background:var(--accent); color:#000; }
+.upcoming-nav-left { left:-18px; }
+.upcoming-nav-right { right:-18px; }
+.upcoming-nav:disabled { display:none; }
 
 /* 移动端 */
 @media (max-width:768px) {
@@ -137,6 +148,15 @@ a:hover { text-decoration:underline; }
   .main { margin-left:0; }
   .menu-btn { display:inline-flex !important; }
   .search-input { width:100%; }
+  .upcoming-nav { width:44px; height:44px; font-size:20px; }
+  .upcoming-nav-left { left:4px; }
+  .upcoming-nav-right { right:4px; }
+  .upcoming-card { width:140px; }
+  .upcoming-card-poster { width:140px; height:200px; }
+  .upcoming-card-poster-placeholder { width:140px; height:200px; }
+  .table-wrap { overflow-x:auto; }
+  .detail-grid { grid-template-columns:repeat(2,1fr) !important; }
+  .stats { grid-template-columns:repeat(2,1fr); gap:8px; }
 }
 .menu-btn { display:none; }
 </style>
@@ -335,15 +355,17 @@ a:hover { text-decoration:underline; }
       <div class="toolbar">
         <span class="count-info" id="nowplayingCount">加载中...</span>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
-        <div>
-          <h3 style="margin-bottom:12px;font-size:16px">🇨🇳 中国</h3>
-          <div id="nowplayingCN" class="upcoming-grid"></div>
-        </div>
-        <div>
-          <h3 style="margin-bottom:12px;font-size:16px">🇺🇸 美国</h3>
-          <div id="nowplayingUS" class="upcoming-grid"></div>
-        </div>
+      <div class="upcoming-row">
+        <div class="upcoming-row-header"><h3>🇨🇳 中国</h3><span style="font-size:12px;color:var(--dim)" id="nowplayingCN-count"></span></div>
+        <button class="upcoming-nav upcoming-nav-left" onclick="scrollCarousel('nowplayingCN',-300)">‹</button>
+        <div id="nowplayingCN" class="upcoming-carousel"></div>
+        <button class="upcoming-nav upcoming-nav-right" onclick="scrollCarousel('nowplayingCN',300)">›</button>
+      </div>
+      <div class="upcoming-row">
+        <div class="upcoming-row-header"><h3>🇺🇸 美国</h3><span style="font-size:12px;color:var(--dim)" id="nowplayingUS-count"></span></div>
+        <button class="upcoming-nav upcoming-nav-left" onclick="scrollCarousel('nowplayingUS',-300)">‹</button>
+        <div id="nowplayingUS" class="upcoming-carousel"></div>
+        <button class="upcoming-nav upcoming-nav-right" onclick="scrollCarousel('nowplayingUS',300)">›</button>
       </div>
     </div>
 
@@ -352,15 +374,17 @@ a:hover { text-decoration:underline; }
       <div class="toolbar">
         <span class="count-info" id="upcomingCount">加载中...</span>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
-        <div>
-          <h3 style="margin-bottom:12px;font-size:16px">🇨🇳 中国</h3>
-          <div id="upcomingCN" class="upcoming-grid"></div>
-        </div>
-        <div>
-          <h3 style="margin-bottom:12px;font-size:16px">🇺🇸 美国</h3>
-          <div id="upcomingUS" class="upcoming-grid"></div>
-        </div>
+      <div class="upcoming-row">
+        <div class="upcoming-row-header"><h3>🇨🇳 中国</h3><span style="font-size:12px;color:var(--dim)" id="upcomingCN-count"></span></div>
+        <button class="upcoming-nav upcoming-nav-left" onclick="scrollCarousel('upcomingCN',-300)">‹</button>
+        <div id="upcomingCN" class="upcoming-carousel"></div>
+        <button class="upcoming-nav upcoming-nav-right" onclick="scrollCarousel('upcomingCN',300)">›</button>
+      </div>
+      <div class="upcoming-row">
+        <div class="upcoming-row-header"><h3>🇺🇸 美国</h3><span style="font-size:12px;color:var(--dim)" id="upcomingUS-count"></span></div>
+        <button class="upcoming-nav upcoming-nav-left" onclick="scrollCarousel('upcomingUS',-300)">‹</button>
+        <div id="upcomingUS" class="upcoming-carousel"></div>
+        <button class="upcoming-nav upcoming-nav-right" onclick="scrollCarousel('upcomingUS',300)">›</button>
       </div>
     </div>
 
@@ -399,7 +423,9 @@ var moviePage = 1, movieSort = 'imdb_rating', movieSortDir = 'desc', movieFilter
 var movieTimer = null;
 var doubanData = [], imdbData = [], collectionData = [], filteredCollections = [];
 var doubanPage = 1, collectionPage = 1;
-var PER_PAGE = 50, COL_PER_PAGE = 30;
+var PER_PAGE = 50, COL_PER_PAGE = 30, UPCOMING_PER_PAGE = 10;
+// 上映数据缓存（按 category+region 存储）
+var upcomingCache = {}, upcomingPageNum = {}, upcomingTotalPage = {};
 
 // ===== 主题 =====
 function switchTheme(t) {
@@ -435,8 +461,8 @@ function switchPage(name) {
   if (name === 'douban') loadDouban();
   if (name === 'imdb' && !imdbData.length) loadImdb();
   if (name === 'collections' && !collectionData.length) loadCollections();
-  if (name === 'nowplaying') loadNowPlaying();
-  if (name === 'upcoming') loadUpcoming();
+  if (name === 'nowplaying') { loadNowPlaying(); ; }
+  if (name === 'upcoming') { loadUpcoming(); ; }
 }
 
 // ===== 图片 URL 处理 =====
@@ -540,7 +566,10 @@ function fmtRating(v, votes) {
 }
 
 // ===== 电影页 =====
-function debounceMovieSearch() { clearTimeout(movieTimer); movieTimer = setTimeout(function(){ loadMovies(1); }, 300); }
+function debounceMovieSearch() {
+  clearTimeout(movieTimer);
+  movieTimer = setTimeout(function(){ loadMovies(1); }, 300);
+}
 function setMovieFilter(btn, f) {
   btn.parentElement.querySelectorAll('.filter-btn').forEach(function(b){ b.classList.remove('active'); });
   btn.classList.add('active');
@@ -567,6 +596,10 @@ function loadMovies(page) {
 function renderMovies(movies) {
   var tbody = document.getElementById('movieTbody');
   tbody.innerHTML = '';
+  if (!movies || movies.length === 0) {
+    tbody.innerHTML = '<tr><td colspan=\"11\" style=\"text-align:center;padding:40px 20px\"><div style=\"font-size:36px;margin-bottom:8px\">🔍</div><div style=\"font-size:14px;color:var(--dim)\">没有找到匹配结果</div></td></tr>';
+    return;
+  }
   movies.forEach(function(m,i){
     var tr = document.createElement('tr');
     tr.className = 'clickable-row';
@@ -618,6 +651,10 @@ function renderDouban() {
   var page = filtered.slice(start, start+PER_PAGE);
   var tbody = document.getElementById('doubanTbody');
   tbody.innerHTML = '';
+  if (!page || page.length === 0) {
+    tbody.innerHTML = '<tr><td colspan=\"8\" style=\"text-align:center;padding:40px 20px\"><div style=\"font-size:36px;margin-bottom:8px\">🔍</div><div style=\"font-size:14px;color:var(--dim)\">没有找到匹配结果</div></td></tr>';
+    return;
+  }
   page.forEach(function(m,i){
     var src = m.imdb_source==='manual'?'<span class="badge badge-yellow">手动</span>':m.imdb_source==='auto'?'<span class="badge badge-green">自动</span>':'';
     var imdb = m.imdb_id?'<a href="https://www.imdb.com/title/'+m.imdb_id+'/" target="_blank">'+encodeURI(m.imdb_id)+'</a>'+src:'<span style="color:var(--dim)">-</span>';
@@ -703,15 +740,15 @@ function showEdit(btn, did, title) {
 function saveMapping(did, title) {
   var imdb = document.getElementById('editImdbId').value.trim();
   var note = document.getElementById('editNote').value.trim();
-  if (!imdb||!imdb.startsWith('tt')) { alert('IMDB ID 格式错误'); return; }
+  if (!imdb||!imdb.startsWith('tt')) { showToast('IMDB ID 格式错误', 'error'); return; }
   fetch('/api/mapping',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({douban_id:did,title:title,imdb_id:imdb,note:note})}).then(function(r){return r.json();}).then(function(d){
-    if(d.status==='ok') loadDouban(); else alert(d.message);
+    if(d.status==='ok') { loadDouban(); showToast('保存成功', 'success'); } else showToast(d.message, 'error');
   });
 }
 function deleteMapping(did) {
   if(!confirm('确定删除？')) return;
   fetch('/api/mapping/'+did,{method:'DELETE'}).then(function(r){return r.json();}).then(function(d){
-    if(d.status==='ok') loadDouban(); else alert(d.message);
+    if(d.status==='ok') { loadDouban(); showToast('保存成功', 'success'); } else showToast(d.message, 'error');
   });
 }
 
@@ -739,6 +776,10 @@ function renderImdb() {
   });
   var tbody = document.getElementById('imdbTbody');
   tbody.innerHTML = '';
+  if (!filtered || filtered.length === 0) {
+    tbody.innerHTML = '<tr><td colspan=\"9\" style=\"text-align:center;padding:40px 20px\"><div style=\"font-size:36px;margin-bottom:8px\">🔍</div><div style=\"font-size:14px;color:var(--dim)\">没有找到匹配结果</div></td></tr>';
+    return;
+  }
   filtered.forEach(function(m,i){
     var cls = m.in_emby?'':' style="opacity:.5"';
     var tr = document.createElement('tr');
@@ -791,6 +832,10 @@ function renderCollectionsPage() {
   var page = filteredCollections.slice(start, start+COL_PER_PAGE);
   var tbody = document.getElementById('collectionTbody');
   tbody.innerHTML = '';
+  if (!page || page.length === 0) {
+    tbody.innerHTML = '<tr><td colspan=\"4\" style=\"text-align:center;padding:40px 20px\"><div style=\"font-size:36px;margin-bottom:8px\">🔍</div><div style=\"font-size:14px;color:var(--dim)\">没有找到匹配结果</div></td></tr>';
+    return;
+  }
   page.forEach(function(c,i){
     var owned = (c.total_count||0) - (c.missing_count||0);
     var status = c.total_count>0?(c.missing_count===0?'<span class="badge badge-green">✓ 全部收录 ('+owned+')</span>':'<span style="color:var(--green)">'+owned+'</span> / <span style="color:var(--red)">'+c.missing_count+' 未收录</span>'):'-';
@@ -913,6 +958,22 @@ function fetchLog(type) {
     }
   }).catch(function(){});
 }
+function showToast(msg, type) {
+  var t = document.getElementById("toast");
+  if (!t) {
+    t = document.createElement("div");
+    t.id = "toast";
+    t.style.cssText = "position:fixed;bottom:24px;right:24px;z-index:9999;padding:10px 18px;border-radius:8px;font-size:13px;transition:all .3s;opacity:0;transform:translateY(10px);max-width:360px;pointer-events:none";
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.style.background = type==="error"?"var(--red)":type==="success"?"var(--green)":"var(--accent)";
+  t.style.color = "#fff";
+  t.style.opacity = "1";
+  t.style.transform = "translateY(0)";
+  setTimeout(function(){ t.style.opacity = "0"; t.style.transform = "translateY(10px)"; }, 3000);
+}
+
 function showStatus(type,msg) { document.getElementById('statusBar').innerHTML='<span class="status-msg status-'+type+'">'+escapeHtml(msg)+'</span>'; }
 
 // ===== 即将/正在上映 =====
@@ -930,46 +991,49 @@ function loadMovieList(category, countId, cnId, usId) {
   });
 }
 function loadNowPlaying() { loadMovieList('now_playing', 'nowplayingCount', 'nowplayingCN', 'nowplayingUS'); }
+// function refreshCarousels() { ['nowplayingCN','nowplayingUS','upcomingCN','upcomingUS'].forEach(function(id){ if(document.getElementById(id)) scrollCarousel(id, 0); }); }
 function loadUpcoming() { loadMovieList('upcoming', 'upcomingCount', 'upcomingCN', 'upcomingUS'); }
+
+function scrollCarousel(id, offset) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  var step = el.parentElement.offsetWidth * 0.8;
+  var target = el.scrollLeft + (offset > 0 ? step : -step);
+  target = Math.max(0, Math.min(target, el.scrollWidth - el.clientWidth));
+  var start = el.scrollLeft, diff = target - start, duration = 350, startTime = null;
+  function animate(time) {
+    if (!startTime) startTime = time;
+    var elapsed = time - startTime;
+    var p = Math.min(elapsed / duration, 1);
+    // ease-out cubic
+    var ease = 1 - Math.pow(1 - p, 3);
+    el.scrollLeft = start + diff * ease;
+    if (p < 1) requestAnimationFrame(animate);
+  }
+  requestAnimationFrame(animate);
+}
 
 function renderMovieCards(containerId, movies) {
   var container = document.getElementById(containerId);
-  // 先渲染无图片版本，然后延迟加载图片
-  container.innerHTML = movies.map(function(m, i){
-    var poster = '<div class="upcoming-poster" data-src="' + (m.poster_url ? posterSrc(m.poster_url) : '') + '"></div>';
+  container.innerHTML = movies.map(function(m){
+    var posterUrl = m.poster_url ? posterSrc(m.poster_url) : '';
     var date = m.release_date || '-';
     var rating = m.rating > 0 ? '⭐ ' + parseFloat(m.rating).toFixed(1) : '';
-    return '<div class="upcoming-card">' +
-      poster +
-      '<div class="upcoming-info">' +
-      '<div class="upcoming-title"><a href="https://www.themoviedb.org/movie/' + m.tmdb_id + '" target="_blank">' + escapeHtml(m.title) + '</a></div>' +
-      '<div class="upcoming-meta"><span>📅 ' + date + '</span>' + (rating ? '<span>' + rating + '</span>' : '') + '</div>' +
-      '<div class="upcoming-overview">' + escapeHtml(m.overview || '-') + '</div>' +
+    var tmdbLink = 'https://www.themoviedb.org/movie/' + m.tmdb_id;
+    var posterHtml = posterUrl
+      ? '<img class="upcoming-card-poster" src="' + posterUrl + '" alt="" loading="lazy">'
+      : '<div class="upcoming-card-poster upcoming-card-poster-placeholder">🎬</div>';
+    return '<div class="upcoming-card" onclick="window.open(\'' + tmdbLink + '\',\'_blank\')">' +
+      posterHtml +
+      '<div class="upcoming-card-info">' +
+      '<div class="upcoming-card-title">' + escapeHtml(m.title) + '</div>' +
+      '<div class="upcoming-card-meta"><span>📅 ' + date + '</span>' + (rating ? '<span>' + rating + '</span>' : '') + '</div>' +
       '</div></div>';
   }).join('');
-  // 延迟加载图片（每张间隔 200ms，避免并发过多）
-  lazyLoadPosters(container);
-}
-
-function lazyLoadPosters(container) {
-  var posters = container.querySelectorAll('.upcoming-poster[data-src]');
-  var i = 0;
-  function loadNext() {
-    if (i >= posters.length) return;
-    var el = posters[i];
-    var src = el.getAttribute('data-src');
-    if (src) {
-      var img = document.createElement('img');
-      img.className = 'upcoming-poster';
-      img.src = src;
-      img.alt = '';
-      img.loading = 'lazy';
-      el.parentNode.replaceChild(img, el);
-    }
-    i++;
-    setTimeout(loadNext, 200);  // 每张间隔 200ms
-  }
-  loadNext();
+    // 更新计数
+  var countId = containerId + '-count';
+  var countEl = document.getElementById(countId);
+  if (countEl) countEl.textContent = movies.length + ' 部';
 }
 
 // ===== 初始化 =====
@@ -993,8 +1057,8 @@ document.addEventListener('DOMContentLoaded', function(){
     if (savedPage === 'douban') loadDouban();
     if (savedPage === 'imdb') loadImdb();
     if (savedPage === 'collections') loadCollections();
-    if (savedPage === 'nowplaying') loadNowPlaying();
-    if (savedPage === 'upcoming') loadUpcoming();
+    if (savedPage === 'nowplaying') { loadNowPlaying(); ; }
+    if (savedPage === 'upcoming') { loadUpcoming(); ; }
   } else {
     // 兜底：默认概览
     document.querySelector('.nav-item').classList.add('active');

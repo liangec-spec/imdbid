@@ -221,6 +221,34 @@ curl -s "http://your-emby-server:8096/Library/VirtualFolders?api_key=your-api-ke
 
 ## 📜 更新日志
 
+### v2.3.1 (2026-06-25)
+
+UI/UX 全面优化 + 批量写入性能提升
+
+#### 🎨 前端优化
+- **上映页改为横向轮播**：CN/US 各一行，左右箭头滑动浏览
+- **自定义滚动动画**：`requestAnimationFrame` 缓动滚动，替代原生 scroll
+- **排序调整**：即将上映按日期从早到晚，正在上映从晚到早
+- **无海报占位符**：缺失海报的电影显示 🎬 图标
+- **Toast 通知系统**：`alert()` 替换为右下角滑入通知，3 秒自动消失
+- **空状态提示**：搜索无结果时显示 🔍 友好提示
+- **移动端适配**：轮播按钮 44px 触控优化、表格横向滚动、详情网格自适应
+- **行悬停反馈**、导航项间距调优、统计卡片间距调优
+
+#### ⚡ 后端优化
+- **批量 INSERT**：`executemany` 覆盖全部 6 个写入脚本（`export_emby`、`fetch_douban_top250`、`fetch_imdb_top250`、`sync_upcoming`、`sync_collections`、`import_douban`）
+- **IMDB 内存优化**：删除 `all_ratings` 列表，流式累加计算全局平均分
+- **配置抽取**：`MIN_VOTES`、`SCRIPT_TIMEOUT` 等提到 `config/__init__.py`
+- **ON DUPLICATE KEY UPDATE**：修复 `(region, tmdb_id)` 唯一约束冲突
+- **Fetch upcoming 参数优化**：`with_release_type` 过滤
+
+#### 🐛 Bug 修复
+- INNER JOIN 分支缺少 `ir` 联表导致筛选 IMDB/豆瓣时报 SQL 错误
+- `replace_string_in_file` 工具对某些文件写入不生效（改用 Python 直接写入）
+
+#### 📦 依赖变更
+- 新增 `dbutils>=3.1.0`（连接池）
+
 ### v2.3.0 (2026-06-24)
 
 全量优化：安全修复 + 数据完整性 + 代码重构 + 性能优化

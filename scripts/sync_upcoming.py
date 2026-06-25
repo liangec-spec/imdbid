@@ -75,20 +75,25 @@ def save_to_db(category, region, movies):
                 INSERT INTO upcoming_movies
                 (category, region, tmdb_id, title, original_title, release_date, rating, popularity, overview, poster_url)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE
+                    category = VALUES(category),
+                    title = VALUES(title),
+                    original_title = VALUES(original_title),
+                    release_date = VALUES(release_date),
+                    rating = VALUES(rating),
+                    popularity = VALUES(popularity),
+                    overview = VALUES(overview),
+                    poster_url = VALUES(poster_url)
             """
+            rows = []
             for m in movies:
-                cur.execute(sql, (
-                    category,
-                    region,
-                    m["tmdb_id"],
-                    m["title"],
-                    m["original_title"],
-                    m["release_date"],
-                    m["rating"],
-                    m["popularity"],
-                    m["overview"],
-                    m["poster_url"],
+                rows.append((
+                    category, region,
+                    m["tmdb_id"], m["title"], m["original_title"],
+                    m["release_date"], m["rating"], m["popularity"],
+                    m["overview"], m["poster_url"],
                 ))
+            cur.executemany(sql, rows)
 
             conn.commit()
             print(f"  {region}/{category}: 删除 {deleted} 条，插入 {len(movies)} 条")

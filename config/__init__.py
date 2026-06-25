@@ -23,6 +23,22 @@ EMBY_CONFIG = {
 # TMDB 配置
 TMDB_API_KEY = os.getenv("TMDB_API_KEY", "")
 
+# IMDB Top 250 配置
+MIN_VOTES = int(os.getenv("MIN_VOTES", "100000"))       # 最低投票数过滤
+
+# 脚本超时（秒）
+SCRIPT_TIMEOUT = int(os.getenv("SCRIPT_TIMEOUT", "600"))
+
+# 分页配置
+PER_PAGE_DEFAULT = 50
+PER_PAGE_MAX = 100
+UPCOMING_LIMIT = 50
+UPCOMING_PAGES_CN = 5      # 中国上映翻页数
+UPCOMING_PAGES_US = 3      # 美国上映翻页数
+
+# 合集配置
+EMBY_COLLECTIONS_PARENT_ID = os.getenv("EMBY_COLLECTIONS_PARENT_ID", "43626")
+
 # IMDB 数据集 URL
 IMDB_DATASETS = {
     "ratings": "https://datasets.imdbws.com/title.ratings.tsv.gz",

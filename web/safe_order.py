@@ -4,5 +4,5 @@ ORDER BY 白名单安全映射表
 """
 UPCOMING_ORDER_MAP = {
     "upcoming": "release_date ASC",
-    "now_playing": "popularity DESC",
+    "now_playing": "release_date DESC",
 }
