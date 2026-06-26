@@ -32,7 +32,7 @@ COPY data/douban_mapping.json data/douban_mapping.json
 RUN mkdir -p /app/data /app/logs && chown -R appuser:appuser /app
 
 # 添加 cron 任务（每天凌晨 3 点同步即将上映电影）
-RUN echo "0 3 * * * cd /app && python3 scripts/sync_upcoming.py >> /app/logs/upcoming.log 2>&1" > /etc/cron.d/upcoming-sync \
+RUN echo "PATH=/usr/local/bin:/usr/bin:/bin\n0 3 * * * cd /app && python3 scripts/sync_upcoming.py >> /app/logs/upcoming.log 2>&1" > /etc/cron.d/upcoming-sync \
     && chmod 0644 /etc/cron.d/upcoming-sync \
     && crontab /etc/cron.d/upcoming-sync
 
