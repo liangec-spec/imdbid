@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personal Gateway Dashboard</title>
+    <style>
+        :root {
+            --bg-color: #0d1117;
+            --card-bg: rgba(22, 27, 34, 0.7);
+            --card-hover: rgba(33, 38, 45, 0.9);
+            --border-color: rgba(240, 246, 252, 0.1);
+            --text-main: #f0f6fc;
+            --text-sub: #8b949e;
+            --accent: #58a6ff;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px 20px;
+        }
+        header { text-align: center; margin-bottom: 40px; }
+        header h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, #58a6ff, #bc8cff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        header p { color: var(--text-sub); font-size: 0.95rem; }
+        .container { width: 100%; max-width: 1100px; display: flex; flex-direction: column; gap: 30px; }
+        .category-title {
+            font-size: 1.15rem;
+            font-weight: 600;
+            color: var(--text-sub);
+            margin-bottom: 15px;
+            border-left: 3px solid var(--accent);
+            padding-left: 10px;
+        }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 18px 20px;
+            text-decoration: none;
+            color: inherit;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            backdrop-filter: blur(10px);
+            transition: all 0.2s ease-in-out;
+        }
+        .card:hover {
+            background: var(--card-hover);
+            border-color: var(--accent);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+        }
+        .icon {
+            font-size: 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 44px;
+            height: 44px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+        }
+        .info { display: flex; flex-direction: column; overflow: hidden; }
+        .info .title { font-size: 1.05rem; font-weight: 600; color: var(--text-main); }
+        .info .desc {
+            font-size: 0.8rem;
+            color: var(--text-sub);
+            margin-top: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Home Gateway</h1>
+        <p>个人核心私有云与媒体控制中心</p>
+    </header>
+    <div class="container">
+        <!-- 影音与相册 -->
+        <section>
+            <div class="category-title">影音与多媒体</div>
+            <div class="grid">
+                <a class="card" href="https://emby.liangec.com:8443" target="_blank">
+                    <div class="icon">🎬</div>
+                    <div class="info">
+                        <div class="title">Emby</div>
+                        <div class="desc">个人流媒体影音中心</div>
+                    </div>
+                </a>
+                <a class="card" href="https://movie.liangec.com:8443" target="_blank">
+                    <div class="icon">🍿</div>
+                    <div class="info">
+                        <div class="title">Movie</div>
+                        <div class="desc">备用影视与点播平台</div>
+                    </div>
+                </a>
+                <a class="card" href="https://immich.liangec.com:8443" target="_blank">
+                    <div class="icon">📸</div>
+                    <div class="info">
+                        <div class="title">Immich</div>
+                        <div class="desc">私有相册与智能备份</div>
+                    </div>
+                </a>
+            </div>
+        </section>
+
+        <!-- 存储与下载 -->
+        <section>
+            <div class="category-title">存储与下载管理</div>
+            <div class="grid">
+                <a class="card" href="https://nas1.liangec.com:8443" target="_blank">
+                    <div class="icon">🗄️</div>
+                    <div class="info">
+                        <div class="title">NAS 主存储</div>
+                        <div class="desc">核心数据与文件存储 (50000)</div>
+                    </div>
+                </a>
+                <a class="card" href="https://nas2.liangec.com:8443" target="_blank">
+                    <div class="icon">💾</div>
+                    <div class="info">
+                        <div class="title">NAS 备用存储</div>
+                        <div class="desc">第二节点与备份中心 (33500)</div>
+                    </div>
+                </a>
+                <a class="card" href="https://qcenter.liangec.com:8443" target="_blank">
+                    <div class="icon">🖥️</div>
+                    <div class="info">
+                        <div class="title">Q'center</div>
+                        <div class="desc">NAS 集中管理与设备监控</div>
+                    </div>
+                </a>
+                <a class="card" href="https://qb.liangec.com:8443" target="_blank">
+                    <div class="icon">⬇️</div>
+                    <div class="info">
+                        <div class="title">qBittorrent</div>
+                        <div class="desc">PT / BT 离线下载管理</div>
+                    </div>
+                </a>
+            </div>
+        </section>
+
+        <!-- 系统与网络运维 -->
+        <section>
+            <div class="category-title">运维监控与网络</div>
+            <div class="grid">
+                <a class="card" href="https://nginx.liangec.com:8443" target="_blank">
+                    <div class="icon">📊</div>
+                    <div class="info">
+                        <div class="title">GoAccess</div>
+                        <div class="desc">Nginx 访问与流量实时分析</div>
+                    </div>
+                </a>
+                <a class="card" href="https://nezha.liangec.com:8443" target="_blank">
+                    <div class="icon">⚡</div>
+                    <div class="info">
+                        <div class="title">哪吒探针</div>
+                        <div class="desc">多节点服务器状态大屏</div>
+                    </div>
+                </a>
+                <a class="card" href="https://route.liangec.com:8443" target="_blank">
+                    <div class="icon">🌐</div>
+                    <div class="info">
+                        <div class="title">主路由器</div>
+                        <div class="desc">软路由与网关后台管理</div>
+                    </div>
+                </a>
+                <a class="card" href="https://sub.liangec.com:8443" target="_blank">
+                    <div class="icon">🔗</div>
+                    <div class="info">
+                        <div class="title">订阅转换</div>
+                        <div class="desc">节点聚合与分流规则订阅</div>
+                    </div>
+                </a>
+            </div>
+        </section>
+    </div>
+</body>
+</html>
